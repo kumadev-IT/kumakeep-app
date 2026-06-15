@@ -62,6 +62,11 @@ android {
     }
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+    arg("room.incremental", "true")
+}
+
 dependencies {
     // Core
     implementation(libs.androidx.core.ktx)
