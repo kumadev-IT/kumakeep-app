@@ -10,6 +10,8 @@ import com.kumadev.kumakeep.domain.usecase.AddToWishlistsUseCase
 import com.kumadev.kumakeep.domain.usecase.GetGameDetailUseCase
 import com.kumadev.kumakeep.domain.usecase.GetWishlistsForGameUseCase
 import com.kumadev.kumakeep.domain.usecase.RemoveFromLibraryUseCase
+import com.kumadev.kumakeep.presentation.SnackbarController
+import com.kumadev.kumakeep.presentation.SnackbarEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -32,7 +34,8 @@ class GameDetailViewModel @Inject constructor(
     private val addToLibraryUseCase: AddToLibraryUseCase,
     private val removeFromLibraryUseCase: RemoveFromLibraryUseCase,
     private val getWishlistsForGameUseCase: GetWishlistsForGameUseCase,
-    private val addToWishlistsUseCase: AddToWishlistsUseCase
+    private val addToWishlistsUseCase: AddToWishlistsUseCase,
+    private val snackbarController: SnackbarController
 ) : ViewModel() {
 
     private val bggId: Long = checkNotNull(savedStateHandle["bggId"])
@@ -75,16 +78,36 @@ class GameDetailViewModel @Inject constructor(
                     .onSuccess {
                         _libraryAction.value = LibraryAction.Removed
                         loadGame()
+                        snackbarController.sendEvent(
+                            SnackbarEvent(
+                                message = "\"${state.game.primaryName}\" rimosso dalla libreria",
+                                actionLabel = "Annulla",
+                                onAction = {
+                                    viewModelScope.launch { addToLibraryUseCase(bggId).onSuccess { loadGame() } }
+                                }
+                            )
+                        )
+                    }
+                    .onFailure {
+                        snackbarController.sendEvent(SnackbarEvent(message = "Errore durante la rimozione"))
                     }
             } else {
                 addToLibraryUseCase(bggId)
                     .onSuccess {
                         _libraryAction.value = LibraryAction.Added
                         loadGame()
+                        snackbarController.sendEvent(
+                            SnackbarEvent(message = "\"${state.game.primaryName}\" aggiunto alla libreria")
+                        )
+                    }
+                    .onFailure {
+                        snackbarController.sendEvent(SnackbarEvent(message = "Errore durante l'aggiunta"))
                     }
             }
         }
     }
+
+    fun retry() { loadGame() }
 
     fun openWishlistDialog() { _showWishlistDialog.value = true }
     fun dismissWishlistDialog() { _showWishlistDialog.value = false }
@@ -97,6 +120,15 @@ class GameDetailViewModel @Inject constructor(
         viewModelScope.launch {
             addToWishlistsUseCase(bggId, selectedIds, previousIds)
             _showWishlistDialog.value = false
+            val added = selectedIds.size - (selectedIds intersect previousIds).size
+            val removed = (previousIds - selectedIds).size
+            val message = when {
+                added > 0 && removed > 0 -> "Wishlist aggiornate"
+                added > 0 -> "Aggiunto alle wishlist"
+                removed > 0 -> "Rimosso dalle wishlist"
+                else -> return@launch
+            }
+            snackbarController.sendEvent(SnackbarEvent(message = message))
         }
     }
 }

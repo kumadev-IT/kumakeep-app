@@ -13,6 +13,8 @@ import com.kumadev.kumakeep.domain.usecase.RemoveFromWishlistUseCase
 import com.kumadev.kumakeep.domain.usecase.RenameWishlistUseCase
 import com.kumadev.kumakeep.domain.usecase.ReorderWishlistUseCase
 import com.kumadev.kumakeep.domain.usecase.SearchBggUseCase
+import com.kumadev.kumakeep.presentation.SnackbarController
+import com.kumadev.kumakeep.presentation.SnackbarEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -48,7 +50,8 @@ class WishlistDetailViewModel @Inject constructor(
     private val renameWishlistUseCase: RenameWishlistUseCase,
     private val deleteWishlistUseCase: DeleteWishlistUseCase,
     private val searchBggUseCase: SearchBggUseCase,
-    private val addGameToWishlistUseCase: AddGameToWishlistUseCase
+    private val addGameToWishlistUseCase: AddGameToWishlistUseCase,
+    private val snackbarController: SnackbarController
 ) : ViewModel() {
 
     val wishlistId: Long = checkNotNull(savedStateHandle["wishlistId"])
@@ -84,9 +87,18 @@ class WishlistDetailViewModel @Inject constructor(
         }
     }
 
-    fun removeEntry(bggId: Long) {
+    fun removeEntry(bggId: Long, gameName: String) {
         viewModelScope.launch {
             removeFromWishlistUseCase(bggId, wishlistId)
+            snackbarController.sendEvent(
+                SnackbarEvent(
+                    message = "\"$gameName\" rimosso dalla wishlist",
+                    actionLabel = "Annulla",
+                    onAction = {
+                        viewModelScope.launch { addGameToWishlistUseCase(bggId, wishlistId) }
+                    }
+                )
+            )
         }
     }
 
@@ -140,9 +152,11 @@ class WishlistDetailViewModel @Inject constructor(
     }
 
     /** Aggiunge un gioco trovato dalla ricerca alla wishlist corrente. */
-    fun addGameToWishlist(bggId: Long) {
+    fun addGameToWishlist(bggId: Long, gameName: String) {
         viewModelScope.launch {
             addGameToWishlistUseCase(bggId, wishlistId)
+            snackbarController.sendEvent(SnackbarEvent(message = "\"$gameName\" aggiunto alla wishlist"))
+            clearSearch()
         }
     }
 }

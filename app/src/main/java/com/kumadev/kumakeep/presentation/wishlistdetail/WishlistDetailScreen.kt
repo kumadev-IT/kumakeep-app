@@ -143,7 +143,7 @@ fun WishlistDetailScreen(
                 WishlistEntryList(
                     entries = state.entries,
                     onReorder = viewModel::onReorder,
-                    onRemove = { viewModel.removeEntry(it.bggId) },
+                    onRemove = { viewModel.removeEntry(it.bggId, it.primaryName) },
                     onToggleToBuy = viewModel::toggleToBuy,
                     onGameClick = onGameClick,
                     modifier = Modifier
@@ -166,9 +166,8 @@ fun WishlistDetailScreen(
             SearchAddGameSheet(
                 searchState = searchState,
                 onQueryChange = viewModel::searchBgg,
-                onGameAdd = { bggId ->
-                    viewModel.addGameToWishlist(bggId)
-                    viewModel.clearSearch()
+                onGameAdd = { bggId, name ->
+                    viewModel.addGameToWishlist(bggId, name)
                     showSearchSheet = false
                 }
             )
@@ -349,7 +348,7 @@ private fun WishlistEntryRow(
 private fun SearchAddGameSheet(
     searchState: SearchUiState,
     onQueryChange: (String) -> Unit,
-    onGameAdd: (Long) -> Unit
+    onGameAdd: (bggId: Long, name: String) -> Unit
 ) {
     var query by remember { mutableStateOf("") }
 
@@ -395,7 +394,7 @@ private fun SearchAddGameSheet(
             is SearchUiState.Results -> {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     items(searchState.items, key = { it.bggId }) { result ->
-                        SearchResultRow(result = result, onAdd = { onGameAdd(result.bggId) })
+                        SearchResultRow(result = result, onAdd = { onGameAdd(result.bggId, result.name) })
                     }
                 }
             }

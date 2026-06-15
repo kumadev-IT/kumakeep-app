@@ -104,7 +104,17 @@ fun GameDetailScreen(
             }
             is GameDetailUiState.Error -> {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(state.message, color = MaterialTheme.colorScheme.error)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = "Impossibile caricare il gioco",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyLarge
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        TextButton(onClick = { viewModel.retry() }) {
+                            Text("Riprova", color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
                 }
             }
             is GameDetailUiState.Success -> {

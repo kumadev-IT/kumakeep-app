@@ -106,7 +106,7 @@ fun SearchScreen(
                             SearchResultItem(
                                 result = result,
                                 onGameClick = { onGameClick(result.bggId) },
-                                onAddToLibrary = { viewModel.addToLibrary(result.bggId) }
+                                onAddToLibrary = { viewModel.addToLibrary(result.bggId, result.name) }
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                         }

@@ -100,7 +100,7 @@ fun LibraryScreen(
                         LibraryGameCard(
                             game = game,
                             onClick = { onGameClick(game.bggId) },
-                            onRemove = { viewModel.removeFromLibrary(game.bggId) }
+                            onRemove = { viewModel.removeFromLibrary(game.bggId, game.primaryName) }
                         )
                     }
                 }

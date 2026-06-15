@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.kumadev.kumakeep.domain.model.SearchResult
 import com.kumadev.kumakeep.domain.usecase.AddToLibraryUseCase
 import com.kumadev.kumakeep.domain.usecase.SearchBggUseCase
+import com.kumadev.kumakeep.presentation.SnackbarController
+import com.kumadev.kumakeep.presentation.SnackbarEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,7 +30,8 @@ sealed interface SearchUiState {
 @HiltViewModel
 class SearchViewModel @Inject constructor(
     private val searchBggUseCase: SearchBggUseCase,
-    private val addToLibraryUseCase: AddToLibraryUseCase
+    private val addToLibraryUseCase: AddToLibraryUseCase,
+    private val snackbarController: SnackbarController
 ) : ViewModel() {
 
     private val _query = MutableStateFlow("")
@@ -59,15 +62,20 @@ class SearchViewModel @Inject constructor(
             _uiState.value = SearchUiState.Loading
             searchBggUseCase(query)
                 .onSuccess { _uiState.value = SearchUiState.Success(it) }
-                .onFailure { _uiState.value = SearchUiState.Error(it.message ?: "Errore sconosciuto") }
+                .onFailure { _uiState.value = SearchUiState.Error("Errore di rete. Controlla la connessione.") }
         }
     }
 
-    fun addToLibrary(bggId: Long) {
+    fun addToLibrary(bggId: Long, gameName: String) {
         viewModelScope.launch {
             addToLibraryUseCase(bggId)
-                .onSuccess { _addedToLibrary.value = bggId }
-                .onFailure { /* già in libreria o errore rete */ }
+                .onSuccess {
+                    _addedToLibrary.value = bggId
+                    snackbarController.sendEvent(SnackbarEvent(message = "\"$gameName\" aggiunto alla libreria"))
+                }
+                .onFailure {
+                    snackbarController.sendEvent(SnackbarEvent(message = "Errore durante l'aggiunta"))
+                }
         }
     }
 }
