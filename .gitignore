@@ -1,0 +1,27 @@
+# Android Studio
+*.iml
+.idea/
+.gradle/
+*.hprof
+
+# Build
+/build/
+app/build/
+**/build/
+
+# Keystore (MAI committare)
+*.jks
+*.keystore
+release/
+
+# Secrets
+local.properties
+google-services.json
+secrets.properties
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Kotlin
+*.class
