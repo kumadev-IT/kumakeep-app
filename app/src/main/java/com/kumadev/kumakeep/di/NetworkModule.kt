@@ -1,5 +1,6 @@
 package com.kumadev.kumakeep.di
 
+import com.kumadev.kumakeep.BuildConfig
 import com.kumadev.kumakeep.data.remote.api.BggApiService
 import dagger.Module
 import dagger.Provides
@@ -22,6 +23,14 @@ object NetworkModule {
             level = HttpLoggingInterceptor.Level.BODY
         }
         return OkHttpClient.Builder()
+            .addInterceptor { chain ->
+                val request = chain.request().newBuilder()
+                    .header("Authorization", "Bearer ${BuildConfig.BGG_TOKEN}")
+                    .header("User-Agent", "KumaKeep/1.0 (Android; kumadev.code@gmail.com)")
+                    .header("Accept", "application/xml")
+                    .build()
+                chain.proceed(request)
+            }
             .addInterceptor(logging)
             .build()
     }

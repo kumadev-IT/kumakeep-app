@@ -8,7 +8,7 @@ import org.simpleframework.xml.Root
 @Root(name = "items", strict = false)
 data class BggSearchResponse(
     @field:ElementList(inline = true, required = false, entry = "item")
-    var items: List<BggSearchItemDto> = emptyList()
+    var items: MutableList<BggSearchItemDto> = mutableListOf()
 )
 
 @Root(name = "item", strict = false)

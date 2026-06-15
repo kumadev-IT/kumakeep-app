@@ -42,5 +42,6 @@ data class WishlistEntryEntity(
     val bggId: Long,
     val toBuy: Boolean = false,
     val notes: String? = null,
+    val sortOrder: Int = 0,
     val createdAt: Long = System.currentTimeMillis()
 )

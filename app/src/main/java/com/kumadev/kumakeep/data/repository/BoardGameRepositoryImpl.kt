@@ -53,10 +53,12 @@ class BoardGameRepositoryImpl @Inject constructor(
     }
 
     override fun getLibraryGames(): Flow<List<BoardGame>> {
-        return combine(
-            libraryDao.getAll(),
-            boardGameDao.getByBggIds(emptyList()) // placeholder, vedi sotto
-        ) { _, _ -> emptyList() } // implementazione completa nel prossimo step
+        return libraryDao.getAll().map { libraryEntries ->
+            libraryEntries.mapNotNull { entry ->
+                val game = boardGameDao.getByBggId(entry.bggId) ?: return@mapNotNull null
+                game.toDomain(entry)
+            }
+        }
     }
 
     override fun searchLibrary(query: String): Flow<List<BoardGame>> {

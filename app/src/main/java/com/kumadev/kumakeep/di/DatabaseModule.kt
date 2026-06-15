@@ -24,7 +24,9 @@ object DatabaseModule {
             context,
             KumaKeepDatabase::class.java,
             "kumakeep.db"
-        ).build()
+        )
+            .addMigrations(KumaKeepDatabase.MIGRATION_1_2)
+            .build()
     }
 
     @Provides

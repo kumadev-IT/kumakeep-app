@@ -8,7 +8,7 @@ import org.simpleframework.xml.Root
 @Root(name = "items", strict = false)
 data class BggThingResponse(
     @field:ElementList(inline = true, required = false)
-    var items: List<BggItemDto> = emptyList()
+    var items: MutableList<BggItemDto> = mutableListOf()
 )
 
 @Root(name = "item", strict = false)
@@ -17,7 +17,7 @@ data class BggItemDto(
     var id: Long = 0,
 
     @field:ElementList(inline = true, required = false, entry = "name")
-    var names: List<BggNameDto> = emptyList(),
+    var names: MutableList<BggNameDto> = mutableListOf(),
 
     @field:Element(name = "yearpublished", required = false)
     var yearPublished: BggValueInt? = null,
@@ -44,7 +44,7 @@ data class BggItemDto(
     var image: String? = null,
 
     @field:ElementList(inline = true, required = false, entry = "link")
-    var links: List<BggLinkDto> = emptyList(),
+    var links: List<BggLinkDto> = mutableListOf(),
 
     @field:Element(name = "statistics", required = false)
     var statistics: BggStatisticsDto? = null
