@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -49,8 +50,12 @@ fun WishlistScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Wishlist") })
+            TopAppBar(
+                title = { Text("Wishlist") },
+                windowInsets = WindowInsets(0, 0, 0, 0)
+            )
         },
+        contentWindowInsets = WindowInsets(0),
         floatingActionButton = {
             FloatingActionButton(onClick = { showCreateDialog = true }) {
                 Icon(Icons.Default.Add, contentDescription = "Crea wishlist")
