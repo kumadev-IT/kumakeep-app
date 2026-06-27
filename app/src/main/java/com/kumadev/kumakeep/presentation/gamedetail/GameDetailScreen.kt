@@ -1,5 +1,6 @@
 package com.kumadev.kumakeep.presentation.gamedetail
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +13,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -152,32 +155,53 @@ private fun GameDetailContent(
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
     ) {
-        // Cover image
-        AsyncImage(
-            model = game.image,
-            contentDescription = game.primaryName,
-            contentScale = ContentScale.Crop,
+        // Hero image con titolo in overlay
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .height(220.dp)
-        )
+        ) {
+            AsyncImage(
+                model = game.image,
+                contentDescription = game.primaryName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+            // Gradient scrim per leggibilità del titolo
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(130.dp)
+                    .align(Alignment.BottomStart)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(Color.Transparent, Color(0xCC000000))
+                        )
+                    )
+            )
+            // Titolo + anno sovrapposti
+            Column(
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                Text(
+                    text = game.primaryName,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+                game.yearPublished?.let {
+                    Text(
+                        text = it.toString(),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.75f)
+                    )
+                }
+            }
+        }
 
         Column(modifier = Modifier.padding(16.dp)) {
-
-            // Titolo + anno
-            Text(
-                text = game.primaryName,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            game.yearPublished?.let {
-                Text(
-                    text = it.toString(),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
 
             Spacer(Modifier.height(16.dp))
 
