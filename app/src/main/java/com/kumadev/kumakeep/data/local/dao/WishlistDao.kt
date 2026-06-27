@@ -89,4 +89,7 @@ interface WishlistDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM wishlist_entries WHERE bggId = :bggId)")
     fun isInAnyWishlist(bggId: Long): Flow<Boolean>
+
+    @Query("SELECT COUNT(DISTINCT bggId) FROM wishlist_entries")
+    fun getWishlistGameCount(): Flow<Int>
 }

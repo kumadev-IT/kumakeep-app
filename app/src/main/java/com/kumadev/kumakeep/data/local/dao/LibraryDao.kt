@@ -36,4 +36,10 @@ interface LibraryDao {
 
     @Query("SELECT EXISTS(SELECT 1 FROM library WHERE bggId = :bggId)")
     fun isInLibrary(bggId: Long): Flow<Boolean>
+
+    @Query("SELECT COUNT(*) FROM library")
+    fun getCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM library WHERE numPlays NOT IN ('NOT_CLASSIFIED', 'ZERO')")
+    fun getPlayedCount(): Flow<Int>
 }

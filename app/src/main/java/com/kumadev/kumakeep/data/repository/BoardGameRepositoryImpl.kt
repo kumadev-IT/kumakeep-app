@@ -17,6 +17,7 @@ import javax.inject.Inject
 class BoardGameRepositoryImpl @Inject constructor(
     private val boardGameDao: BoardGameDao,
     private val libraryDao: LibraryDao,
+    private val wishlistDao: com.kumadev.kumakeep.data.local.dao.WishlistDao,
     private val bggApiService: BggApiService
 ) : BoardGameRepository {
 
@@ -66,6 +67,18 @@ class BoardGameRepositoryImpl @Inject constructor(
             entities.map { it.toDomain(null) }
         }
     }
+
+    override fun getPlayedCount(): Flow<Int> = libraryDao.getPlayedCount()
+
+    override fun getWishlistGameCount(): Flow<Int> = wishlistDao.getWishlistGameCount()
+
+    override fun getRecentlyViewedGames(bggIds: List<Long>): Flow<List<BoardGame>> {
+        if (bggIds.isEmpty()) return kotlinx.coroutines.flow.flowOf(emptyList())
+        return boardGameDao.getByBggIds(bggIds).map { entities ->
+            val entityMap = entities.associateBy { it.bggId }
+            bggIds.mapNotNull { id -> entityMap[id]?.toDomain(null) }
+        }
+    }
 }
 
 // extension per convertire Entity → Domain
@@ -94,7 +107,8 @@ private fun BoardGameEntity.toDomain(
                 id = it.id,
                 rate = it.rate.name,
                 numPlays = it.numPlays.name,
-                notes = it.notes
+                notes = it.notes,
+                createdAt = it.createdAt
             )
         }
     )

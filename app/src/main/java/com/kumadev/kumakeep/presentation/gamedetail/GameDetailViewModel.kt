@@ -10,6 +10,7 @@ import com.kumadev.kumakeep.domain.usecase.AddToWishlistsUseCase
 import com.kumadev.kumakeep.domain.usecase.GetGameDetailUseCase
 import com.kumadev.kumakeep.domain.usecase.GetWishlistsForGameUseCase
 import com.kumadev.kumakeep.domain.usecase.RemoveFromLibraryUseCase
+import com.kumadev.kumakeep.data.local.preferences.UserPreferences
 import com.kumadev.kumakeep.presentation.SnackbarController
 import com.kumadev.kumakeep.presentation.SnackbarEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,7 +36,8 @@ class GameDetailViewModel @Inject constructor(
     private val removeFromLibraryUseCase: RemoveFromLibraryUseCase,
     private val getWishlistsForGameUseCase: GetWishlistsForGameUseCase,
     private val addToWishlistsUseCase: AddToWishlistsUseCase,
-    private val snackbarController: SnackbarController
+    private val snackbarController: SnackbarController,
+    private val userPreferences: UserPreferences
 ) : ViewModel() {
 
     private val bggId: Long = checkNotNull(savedStateHandle["bggId"])
@@ -58,6 +60,7 @@ class GameDetailViewModel @Inject constructor(
     val showWishlistDialog: StateFlow<Boolean> = _showWishlistDialog.asStateFlow()
 
     init {
+        userPreferences.addRecentlyViewed(bggId)
         loadGame()
     }
 

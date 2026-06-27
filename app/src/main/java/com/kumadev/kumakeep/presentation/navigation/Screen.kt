@@ -1,6 +1,7 @@
 package com.kumadev.kumakeep.presentation.navigation
 
 sealed class Screen(val route: String) {
+    data object Home : Screen("home")
     data object Library : Screen("library")
     data object Search : Screen("search")
     data object GameDetail : Screen("game_detail/{bggId}") {

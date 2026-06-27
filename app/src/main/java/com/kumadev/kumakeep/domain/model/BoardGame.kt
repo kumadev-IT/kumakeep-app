@@ -25,7 +25,8 @@ data class LibraryEntry(
     val id: Long,
     val rate: String,
     val numPlays: String,
-    val notes: String?
+    val notes: String?,
+    val createdAt: Long = 0L
 )
 
 // risultato leggero per la lista di ricerca BGG (no dettagli)

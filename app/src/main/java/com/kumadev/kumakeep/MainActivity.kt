@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CollectionsBookmark
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -70,6 +71,7 @@ class MainActivity : ComponentActivity() {
                 // nasconde la bottom bar nel Game Detail e WishlistDetail
                 val showBottomBar = currentRoute != Screen.GameDetail.route
                         && currentRoute != Screen.WishlistDetail.route
+                        && currentRoute != null
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
@@ -88,10 +90,23 @@ class MainActivity : ComponentActivity() {
                         if (showBottomBar) {
                             NavigationBar(containerColor = SurfaceDark) {
                                 NavigationBarItem(
+                                    selected = currentRoute == Screen.Home.route,
+                                    onClick = { navController.navigate(Screen.Home.route) },
+                                    icon = { Icon(Icons.Default.Home, null) },
+                                    label = { Text("Home") },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedIconColor = AccentOrange,
+                                        selectedTextColor = AccentOrange,
+                                        unselectedIconColor = TextSecondary,
+                                        unselectedTextColor = TextSecondary,
+                                        indicatorColor = SurfaceDark
+                                    )
+                                )
+                                NavigationBarItem(
                                     selected = currentRoute == Screen.Library.route,
                                     onClick = { navController.navigate(Screen.Library.route) },
                                     icon = { Icon(Icons.Default.CollectionsBookmark, null) },
-                                    label = { Text("Libreria") },
+                                    label = { Text("Library") },
                                     colors = NavigationBarItemDefaults.colors(
                                         selectedIconColor = AccentOrange,
                                         selectedTextColor = AccentOrange,
@@ -104,7 +119,7 @@ class MainActivity : ComponentActivity() {
                                     selected = currentRoute == Screen.Search.route,
                                     onClick = { navController.navigate(Screen.Search.route) },
                                     icon = { Icon(Icons.Default.Search, null) },
-                                    label = { Text("Cerca") },
+                                    label = { Text("Search") },
                                     colors = NavigationBarItemDefaults.colors(
                                         selectedIconColor = AccentOrange,
                                         selectedTextColor = AccentOrange,

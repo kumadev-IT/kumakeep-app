@@ -7,6 +7,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import com.kumadev.kumakeep.presentation.gamedetail.GameDetailScreen
+import com.kumadev.kumakeep.presentation.home.HomeScreen
 import com.kumadev.kumakeep.presentation.library.LibraryScreen
 import com.kumadev.kumakeep.presentation.search.SearchScreen
 import com.kumadev.kumakeep.presentation.wishlist.WishlistScreen
@@ -16,8 +17,16 @@ import com.kumadev.kumakeep.presentation.wishlistdetail.WishlistDetailScreen
 fun KumaKeepNavGraph(navController: NavHostController) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Search.route
+        startDestination = Screen.Home.route
     ) {
+        composable(Screen.Home.route) {
+            HomeScreen(
+                onGameClick = { bggId ->
+                    navController.navigate(Screen.GameDetail.createRoute(bggId))
+                }
+            )
+        }
+
         composable(Screen.Search.route) {
             SearchScreen(
                 onGameClick = { bggId ->

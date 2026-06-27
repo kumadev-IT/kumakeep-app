@@ -9,4 +9,7 @@ interface BoardGameRepository {
     suspend fun getGameDetail(bggId: Long): Result<BoardGame>
     fun getLibraryGames(): Flow<List<BoardGame>>
     fun searchLibrary(query: String): Flow<List<BoardGame>>
+    fun getPlayedCount(): Flow<Int>
+    fun getWishlistGameCount(): Flow<Int>
+    fun getRecentlyViewedGames(bggIds: List<Long>): Flow<List<BoardGame>>
 }
