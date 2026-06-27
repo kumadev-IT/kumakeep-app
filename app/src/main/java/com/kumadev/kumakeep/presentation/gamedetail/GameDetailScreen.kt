@@ -1,5 +1,7 @@
 package com.kumadev.kumakeep.presentation.gamedetail
 
+import android.os.Build
+import android.text.Html
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +56,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -261,6 +265,35 @@ private fun GameDetailContent(
                 InfoRow("Meccaniche", game.mechanics.take(4).joinToString(", "))
             }
 
+            // Descrizione
+            if (!game.description.isNullOrBlank()) {
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = SurfaceVariant)
+                Spacer(Modifier.height(12.dp))
+
+                var descriptionExpanded by remember { mutableStateOf(false) }
+                val cleanDescription = remember(game.description) { game.description.parseHtml() }
+
+                Text(
+                    text = cleanDescription,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Justify,
+                    maxLines = if (descriptionExpanded) Int.MAX_VALUE else 5,
+                    overflow = if (descriptionExpanded) TextOverflow.Visible else TextOverflow.Ellipsis
+                )
+                TextButton(
+                    onClick = { descriptionExpanded = !descriptionExpanded },
+                    contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                ) {
+                    Text(
+                        text = if (descriptionExpanded) "Mostra meno" else "Mostra tutto",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
             Spacer(Modifier.height(24.dp))
 
             // Bottone aggiungi/rimuovi libreria
@@ -403,4 +436,28 @@ private fun WishlistSelectionSheet(
             }
         }
     }
+}
+
+@Suppress("DEPRECATION")
+private fun String.parseHtml(): String {
+    // Html.fromHtml() tratta i \n come whitespace HTML e li collassa.
+    // Convertiamo prima i newline (sia come entità &#10; non ancora decodificate
+    // sia come caratteri \n già decodificati dal parser XML) in <br>,
+    // così il parser li preserva come salti di riga.
+    val normalized = this
+        .replace("&#10;", "<br>")
+        .replace("\n", "<br>")
+
+    val parsed = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+        Html.fromHtml(normalized, Html.FROM_HTML_MODE_LEGACY)
+    } else {
+        Html.fromHtml(normalized)
+    }.toString()
+
+    // Rimuove spazi a fine riga, collassa 3+ newline a 2 (un'interlinea tra paragrafi)
+    return parsed
+        .lines()
+        .joinToString("\n") { it.trimEnd() }
+        .replace(Regex("\n{3,}"), "\n\n")
+        .trim()
 }
