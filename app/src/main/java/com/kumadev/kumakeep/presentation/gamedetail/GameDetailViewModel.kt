@@ -5,11 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.WishlistWithStatus
+import com.kumadev.kumakeep.data.local.entity.NumPlays
+import com.kumadev.kumakeep.data.local.entity.UserRate
 import com.kumadev.kumakeep.domain.usecase.AddToLibraryUseCase
 import com.kumadev.kumakeep.domain.usecase.AddToWishlistsUseCase
 import com.kumadev.kumakeep.domain.usecase.GetGameDetailUseCase
 import com.kumadev.kumakeep.domain.usecase.GetWishlistsForGameUseCase
 import com.kumadev.kumakeep.domain.usecase.RemoveFromLibraryUseCase
+import com.kumadev.kumakeep.domain.usecase.UpdateLibraryEntryUseCase
 import com.kumadev.kumakeep.data.local.preferences.UserPreferences
 import com.kumadev.kumakeep.presentation.SnackbarController
 import com.kumadev.kumakeep.presentation.SnackbarEvent
@@ -34,6 +37,7 @@ class GameDetailViewModel @Inject constructor(
     private val getGameDetailUseCase: GetGameDetailUseCase,
     private val addToLibraryUseCase: AddToLibraryUseCase,
     private val removeFromLibraryUseCase: RemoveFromLibraryUseCase,
+    private val updateLibraryEntryUseCase: UpdateLibraryEntryUseCase,
     private val getWishlistsForGameUseCase: GetWishlistsForGameUseCase,
     private val addToWishlistsUseCase: AddToWishlistsUseCase,
     private val snackbarController: SnackbarController,
@@ -58,6 +62,12 @@ class GameDetailViewModel @Inject constructor(
 
     private val _showWishlistDialog = MutableStateFlow(false)
     val showWishlistDialog: StateFlow<Boolean> = _showWishlistDialog.asStateFlow()
+
+    private val _showRatingSheet = MutableStateFlow(false)
+    val showRatingSheet: StateFlow<Boolean> = _showRatingSheet.asStateFlow()
+
+    private val _showNumPlaysSheet = MutableStateFlow(false)
+    val showNumPlaysSheet: StateFlow<Boolean> = _showNumPlaysSheet.asStateFlow()
 
     init {
         userPreferences.addRecentlyViewed(bggId)
@@ -114,6 +124,30 @@ class GameDetailViewModel @Inject constructor(
 
     fun openWishlistDialog() { _showWishlistDialog.value = true }
     fun dismissWishlistDialog() { _showWishlistDialog.value = false }
+
+    fun openRatingSheet() { _showRatingSheet.value = true }
+    fun dismissRatingSheet() { _showRatingSheet.value = false }
+
+    fun openNumPlaysSheet() { _showNumPlaysSheet.value = true }
+    fun dismissNumPlaysSheet() { _showNumPlaysSheet.value = false }
+
+    fun updateRate(rateName: String) {
+        viewModelScope.launch {
+            _showRatingSheet.value = false
+            updateLibraryEntryUseCase(bggId, rate = UserRate.valueOf(rateName))
+                .onSuccess { loadGame() }
+                .onFailure { snackbarController.sendEvent(SnackbarEvent("Errore aggiornamento valutazione")) }
+        }
+    }
+
+    fun updateNumPlays(numPlaysName: String) {
+        viewModelScope.launch {
+            _showNumPlaysSheet.value = false
+            updateLibraryEntryUseCase(bggId, numPlays = NumPlays.valueOf(numPlaysName))
+                .onSuccess { loadGame() }
+                .onFailure { snackbarController.sendEvent(SnackbarEvent("Errore aggiornamento partite")) }
+        }
+    }
 
     fun saveWishlistSelections(selectedIds: Set<Long>) {
         val previousIds = wishlistsForGame.value

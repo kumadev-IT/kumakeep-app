@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -28,19 +26,23 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Groups
+import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Favorite
-import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.material3.BottomAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -54,6 +56,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -63,6 +68,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.kumadev.kumakeep.domain.model.BoardGame
+import com.kumadev.kumakeep.domain.model.LibraryEntry
 import com.kumadev.kumakeep.domain.model.WishlistWithStatus
 import com.kumadev.kumakeep.presentation.theme.AccentGreen
 import com.kumadev.kumakeep.presentation.theme.AccentOrange
@@ -79,6 +85,8 @@ fun GameDetailScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
     val showWishlistDialog by viewModel.showWishlistDialog.collectAsStateWithLifecycle()
     val wishlistsForGame by viewModel.wishlistsForGame.collectAsStateWithLifecycle()
+    val showRatingSheet by viewModel.showRatingSheet.collectAsStateWithLifecycle()
+    val showNumPlaysSheet by viewModel.showNumPlaysSheet.collectAsStateWithLifecycle()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -104,6 +112,18 @@ fun GameDetailScreen(
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = SurfaceDark),
                 windowInsets = WindowInsets(0, 0, 0, 0)
             )
+        },
+        bottomBar = {
+            val state = uiState
+            if (state is GameDetailUiState.Success) {
+                GameDetailBottomBar(
+                    game = state.game,
+                    onLibraryClick = viewModel::toggleLibrary,
+                    onWishlistClick = viewModel::openWishlistDialog,
+                    onRatingClick = viewModel::openRatingSheet,
+                    onNumPlaysClick = viewModel::openNumPlaysSheet
+                )
+            }
         }
     ) { padding ->
         when (val state = uiState) {
@@ -130,8 +150,6 @@ fun GameDetailScreen(
             is GameDetailUiState.Success -> {
                 GameDetailContent(
                     game = state.game,
-                    onToggleLibrary = viewModel::toggleLibrary,
-                    onOpenWishlistDialog = viewModel::openWishlistDialog,
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -145,13 +163,119 @@ fun GameDetailScreen(
             onConfirm = viewModel::saveWishlistSelections
         )
     }
+
+    val currentState = uiState
+    if (showRatingSheet && currentState is GameDetailUiState.Success) {
+        RatingSheet(
+            currentRate = currentState.game.libraryEntry?.rate ?: "NOT_RATED",
+            onSelect = viewModel::updateRate,
+            onDismiss = viewModel::dismissRatingSheet
+        )
+    }
+
+    if (showNumPlaysSheet && currentState is GameDetailUiState.Success) {
+        NumPlaysSheet(
+            currentNumPlays = currentState.game.libraryEntry?.numPlays ?: "NOT_CLASSIFIED",
+            onSelect = viewModel::updateNumPlays,
+            onDismiss = viewModel::dismissNumPlaysSheet
+        )
+    }
 }
+
+// ─── Bottom action bar ────────────────────────────────────────────────────────
+
+@Composable
+private fun GameDetailBottomBar(
+    game: BoardGame,
+    onLibraryClick: () -> Unit,
+    onWishlistClick: () -> Unit,
+    onRatingClick: () -> Unit,
+    onNumPlaysClick: () -> Unit
+) {
+    val inLibrary = game.libraryEntry != null
+    val rateLabel = game.libraryEntry?.rate?.toRateLabel()
+    val numPlaysLabel = game.libraryEntry?.numPlays?.toNumPlaysLabel()
+
+    BottomAppBar(
+        containerColor = SurfaceDark,
+        tonalElevation = 0.dp,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+        windowInsets = WindowInsets(0),
+        modifier = Modifier.height(60.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BottomBarItem(
+                icon = if (inLibrary) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                label = "Libreria",
+                tint = if (inLibrary) AccentOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = onLibraryClick
+            )
+            BottomBarItem(
+                icon = Icons.Outlined.Favorite,
+                label = "Wishlist",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = onWishlistClick
+            )
+            BottomBarItem(
+                icon = Icons.Default.Star,
+                label = rateLabel ?: "Voto",
+                tint = if (rateLabel != null) AccentOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                enabled = inLibrary,
+                onClick = onRatingClick
+            )
+            BottomBarItem(
+                icon = Icons.Default.Replay,
+                label = numPlaysLabel ?: "Partite",
+                tint = if (numPlaysLabel != null) AccentGreen else MaterialTheme.colorScheme.onSurfaceVariant,
+                enabled = inLibrary,
+                onClick = onNumPlaysClick
+            )
+            BottomBarItem(
+                icon = Icons.Default.Label,
+                label = "Tag",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                enabled = false,
+                onClick = {}
+            )
+        }
+    }
+}
+
+@Composable
+private fun BottomBarItem(
+    icon: ImageVector,
+    label: String,
+    tint: Color,
+    enabled: Boolean = true,
+    onClick: () -> Unit
+) {
+    val effectiveTint = if (enabled) tint else tint.copy(alpha = 0.35f)
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.padding(horizontal = 4.dp)
+    ) {
+        IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(32.dp)) {
+            Icon(icon, contentDescription = label, tint = effectiveTint, modifier = Modifier.size(20.dp))
+        }
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelSmall,
+            color = effectiveTint,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+// ─── Main content ─────────────────────────────────────────────────────────────
 
 @Composable
 private fun GameDetailContent(
     game: BoardGame,
-    onToggleLibrary: () -> Unit,
-    onOpenWishlistDialog: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -171,7 +295,6 @@ private fun GameDetailContent(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxSize()
             )
-            // Gradient scrim per leggibilità del titolo
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -183,7 +306,6 @@ private fun GameDetailContent(
                         )
                     )
             )
-            // Titolo + anno sovrapposti
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomStart)
@@ -209,32 +331,26 @@ private fun GameDetailContent(
 
             Spacer(Modifier.height(16.dp))
 
-            // Stats row
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                // Giocatori
+            // Stats row (dati BGG)
+            Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 if (game.minPlayers != null && game.maxPlayers != null) {
                     StatItem(
                         icon = { Icon(Icons.Default.Groups, null, tint = AccentOrange, modifier = Modifier.size(16.dp)) },
                         label = "${game.minPlayers}–${game.maxPlayers}"
                     )
                 }
-                // Durata
                 game.playingTime?.let {
                     StatItem(
                         icon = { Icon(Icons.Default.Schedule, null, tint = AccentOrange, modifier = Modifier.size(16.dp)) },
-                        label = "${it} min"
+                        label = "$it min"
                     )
                 }
-                // Voto BGG
                 game.bggRating?.let {
                     StatItem(
                         icon = { Icon(Icons.Default.Star, null, tint = AccentOrange, modifier = Modifier.size(16.dp)) },
                         label = String.format("%.1f", it)
                     )
                 }
-                // Complessità
                 game.complexity?.let {
                     StatItem(
                         icon = { Text("⚙", style = MaterialTheme.typography.labelSmall) },
@@ -247,22 +363,23 @@ private fun GameDetailContent(
             HorizontalDivider(color = SurfaceVariant)
             Spacer(Modifier.height(16.dp))
 
-            // Designer + Publisher
+            // Designer + Publisher + Categorie + Meccaniche
             if (game.designers.isNotEmpty()) {
                 InfoRow("Designer", game.designers.take(3).joinToString(", "))
             }
             if (game.publishers.isNotEmpty()) {
                 InfoRow("Editore", game.publishers.take(2).joinToString(", "))
             }
-
-            // Categorie
             if (game.categories.isNotEmpty()) {
                 InfoRow("Categorie", game.categories.take(4).joinToString(", "))
             }
-
-            // Meccaniche
             if (game.mechanics.isNotEmpty()) {
                 InfoRow("Meccaniche", game.mechanics.take(4).joinToString(", "))
+            }
+
+            // Badge utente (rating + numPlays): visibili solo se impostati
+            game.libraryEntry?.let { entry ->
+                UserBadgesSection(entry)
             }
 
             // Descrizione
@@ -294,49 +411,143 @@ private fun GameDetailContent(
                 }
             }
 
-            Spacer(Modifier.height(24.dp))
-
-            // Bottone aggiungi/rimuovi libreria
-            val inLibrary = game.libraryEntry != null
-            FilledTonalButton(
-                onClick = onToggleLibrary,
-                modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.filledTonalButtonColors(
-                    containerColor = if (inLibrary) SurfaceVariant else AccentOrange,
-                    contentColor = MaterialTheme.colorScheme.onSurface
-                )
-            ) {
-                Icon(
-                    imageVector = if (inLibrary) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp)
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(if (inLibrary) "In libreria" else "Aggiungi alla libreria")
-            }
-
-            Spacer(Modifier.height(8.dp))
-
-            // Bottone wishlist
-            OutlinedButton(
-                onClick = onOpenWishlistDialog,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Icon(Icons.Outlined.Favorite, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Wishlist")
-            }
+            Spacer(Modifier.height(16.dp))
         }
     }
 }
+
+// ─── Badge sezione utente ─────────────────────────────────────────────────────
+
+@Composable
+private fun UserBadgesSection(entry: LibraryEntry) {
+    val rateLabel = entry.rate.toRateLabel()
+    val numPlaysLabel = entry.numPlays.toNumPlaysLabel()
+
+    // Ometti la sezione se non c'è nulla da mostrare
+    if (rateLabel == null && numPlaysLabel == null) return
+
+    Spacer(Modifier.height(16.dp))
+    HorizontalDivider(color = SurfaceVariant)
+    Spacer(Modifier.height(12.dp))
+
+    // Riga 1: rating + numPlays
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        rateLabel?.let { label ->
+            AssistChip(
+                onClick = {},
+                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Star,
+                        contentDescription = null,
+                        tint = AccentOrange,
+                        modifier = Modifier.size(14.dp)
+                    )
+                },
+                colors = AssistChipDefaults.assistChipColors(containerColor = SurfaceVariant),
+                border = null
+            )
+        }
+        numPlaysLabel?.let { label ->
+            AssistChip(
+                onClick = {},
+                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.Replay,
+                        contentDescription = null,
+                        tint = AccentGreen,
+                        modifier = Modifier.size(14.dp)
+                    )
+                },
+                colors = AssistChipDefaults.assistChipColors(containerColor = SurfaceVariant),
+                border = null
+            )
+        }
+    }
+    // Riga 2: tag utente (future feature)
+}
+
+// ─── Sheet valutazione ────────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun RatingSheet(
+    currentRate: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val options = listOf("BAH" to "Meh", "MID" to "Ok", "YES" to "Sì!", "TOP" to "Top", "WOW" to "Wow")
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            Text("La tua valutazione", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                options.forEach { (value, label) ->
+                    val selected = currentRate == value
+                    FilterChip(
+                        selected = selected,
+                        onClick = { onSelect(if (selected) "NOT_RATED" else value) },
+                        label = { Text(label) }
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+// ─── Sheet partite giocate ────────────────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NumPlaysSheet(
+    currentNumPlays: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val options = listOf("ZERO" to "0", "ONE" to "1", "MANY" to "Alcune", "PLENTY" to "Tante")
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            Text("Partite giocate", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                options.forEach { (value, label) ->
+                    val selected = currentNumPlays == value
+                    FilterChip(
+                        selected = selected,
+                        onClick = { onSelect(if (selected) "NOT_CLASSIFIED" else value) },
+                        label = { Text(label) }
+                    )
+                }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+// ─── Componenti riutilizzabili ────────────────────────────────────────────────
 
 @Composable
 private fun StatItem(icon: @Composable () -> Unit, label: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         icon()
         Spacer(Modifier.width(4.dp))
-        Text(label, style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurface)
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
     }
 }
 
@@ -356,6 +567,8 @@ private fun InfoRow(label: String, value: String) {
         )
     }
 }
+
+// ─── Wishlist bottom sheet ────────────────────────────────────────────────────
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -438,12 +651,27 @@ private fun WishlistSelectionSheet(
     }
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+private fun String.toRateLabel(): String? = when (this) {
+    "BAH" -> "Meh"
+    "MID" -> "Ok"
+    "YES" -> "Sì!"
+    "TOP" -> "Top"
+    "WOW" -> "Wow"
+    else -> null
+}
+
+private fun String.toNumPlaysLabel(): String? = when (this) {
+    "ZERO" -> "0 partite"
+    "ONE" -> "1 partita"
+    "MANY" -> "Alcune"
+    "PLENTY" -> "Tante"
+    else -> null
+}
+
 @Suppress("DEPRECATION")
 private fun String.parseHtml(): String {
-    // Html.fromHtml() tratta i \n come whitespace HTML e li collassa.
-    // Convertiamo prima i newline (sia come entità &#10; non ancora decodificate
-    // sia come caratteri \n già decodificati dal parser XML) in <br>,
-    // così il parser li preserva come salti di riga.
     val normalized = this
         .replace("&#10;", "<br>")
         .replace("\n", "<br>")
@@ -454,7 +682,6 @@ private fun String.parseHtml(): String {
         Html.fromHtml(normalized)
     }.toString()
 
-    // Rimuove spazi a fine riga, collassa 3+ newline a 2 (un'interlinea tra paragrafi)
     return parsed
         .lines()
         .joinToString("\n") { it.trimEnd() }
