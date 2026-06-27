@@ -10,6 +10,7 @@ import com.kumadev.kumakeep.presentation.gamedetail.GameDetailScreen
 import com.kumadev.kumakeep.presentation.home.HomeScreen
 import com.kumadev.kumakeep.presentation.library.LibraryScreen
 import com.kumadev.kumakeep.presentation.search.SearchScreen
+import com.kumadev.kumakeep.presentation.settings.SettingsScreen
 import com.kumadev.kumakeep.presentation.wishlist.WishlistScreen
 import com.kumadev.kumakeep.presentation.wishlistdetail.WishlistDetailScreen
 
@@ -23,7 +24,16 @@ fun KumaKeepNavGraph(navController: NavHostController) {
             HomeScreen(
                 onGameClick = { bggId ->
                     navController.navigate(Screen.GameDetail.createRoute(bggId))
+                },
+                onSettingsClick = {
+                    navController.navigate(Screen.Settings.route)
                 }
+            )
+        }
+
+        composable(Screen.Settings.route) {
+            SettingsScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 
