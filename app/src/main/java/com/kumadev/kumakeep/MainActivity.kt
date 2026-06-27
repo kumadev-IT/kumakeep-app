@@ -1,9 +1,11 @@
 package com.kumadev.kumakeep
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import com.kumadev.kumakeep.util.PendingPdfHolder
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -47,6 +49,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        handleIntent(intent)
         enableEdgeToEdge()
         setContent {
             KumaKeepTheme {
@@ -68,9 +71,10 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // nasconde la bottom bar nel Game Detail e WishlistDetail
+                // nasconde la bottom bar nel Game Detail, WishlistDetail e PDF Viewer
                 val showBottomBar = currentRoute != Screen.GameDetail.route
                         && currentRoute != Screen.WishlistDetail.route
+                        && currentRoute != Screen.PdfViewer.route
                         && currentRoute != null
 
                 Scaffold(
@@ -155,6 +159,30 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent) {
+        if (intent.action == Intent.ACTION_SEND && intent.type == "application/pdf") {
+            val uri: android.net.Uri? = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(Intent.EXTRA_STREAM, android.net.Uri::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(Intent.EXTRA_STREAM)
+            }
+            uri ?: return
+            val fileName = contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                cursor.moveToFirst()
+                if (nameIndex >= 0) cursor.getString(nameIndex) else null
+            } ?: "regolamento.pdf"
+            PendingPdfHolder.uri = uri
+            PendingPdfHolder.fileName = fileName
         }
     }
 }

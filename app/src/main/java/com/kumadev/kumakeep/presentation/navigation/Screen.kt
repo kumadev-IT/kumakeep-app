@@ -12,4 +12,7 @@ sealed class Screen(val route: String) {
         fun createRoute(wishlistId: Long) = "wishlist_detail/$wishlistId"
     }
     data object Settings : Screen("settings")
+    data object PdfViewer : Screen("pdf_viewer/{gameId}") {
+        fun createRoute(gameId: Long) = "pdf_viewer/$gameId"
+    }
 }

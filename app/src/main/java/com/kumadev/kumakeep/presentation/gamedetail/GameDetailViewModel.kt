@@ -1,21 +1,27 @@
 package com.kumadev.kumakeep.presentation.gamedetail
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kumadev.kumakeep.domain.model.BoardGame
+import com.kumadev.kumakeep.domain.model.Rulebook
 import com.kumadev.kumakeep.domain.model.WishlistWithStatus
 import com.kumadev.kumakeep.data.local.entity.NumPlays
 import com.kumadev.kumakeep.data.local.entity.UserRate
 import com.kumadev.kumakeep.domain.usecase.AddToLibraryUseCase
 import com.kumadev.kumakeep.domain.usecase.AddToWishlistsUseCase
+import com.kumadev.kumakeep.domain.usecase.DeleteRulebookUseCase
 import com.kumadev.kumakeep.domain.usecase.GetGameDetailUseCase
+import com.kumadev.kumakeep.domain.usecase.GetRulebookUseCase
 import com.kumadev.kumakeep.domain.usecase.GetWishlistsForGameUseCase
+import com.kumadev.kumakeep.domain.usecase.ImportRulebookUseCase
 import com.kumadev.kumakeep.domain.usecase.RemoveFromLibraryUseCase
 import com.kumadev.kumakeep.domain.usecase.UpdateLibraryEntryUseCase
 import com.kumadev.kumakeep.data.local.preferences.UserPreferences
 import com.kumadev.kumakeep.presentation.SnackbarController
 import com.kumadev.kumakeep.presentation.SnackbarEvent
+import com.kumadev.kumakeep.util.PendingPdfHolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -40,11 +46,14 @@ class GameDetailViewModel @Inject constructor(
     private val updateLibraryEntryUseCase: UpdateLibraryEntryUseCase,
     private val getWishlistsForGameUseCase: GetWishlistsForGameUseCase,
     private val addToWishlistsUseCase: AddToWishlistsUseCase,
+    private val getRulebookUseCase: GetRulebookUseCase,
+    private val importRulebookUseCase: ImportRulebookUseCase,
+    private val deleteRulebookUseCase: DeleteRulebookUseCase,
     private val snackbarController: SnackbarController,
     private val userPreferences: UserPreferences
 ) : ViewModel() {
 
-    private val bggId: Long = checkNotNull(savedStateHandle["bggId"])
+    val bggId: Long = checkNotNull(savedStateHandle["bggId"])
 
     private val _uiState = MutableStateFlow<GameDetailUiState>(GameDetailUiState.Loading)
     val uiState: StateFlow<GameDetailUiState> = _uiState.asStateFlow()
@@ -52,12 +61,18 @@ class GameDetailViewModel @Inject constructor(
     private val _libraryAction = MutableStateFlow<LibraryAction?>(null)
     val libraryAction: StateFlow<LibraryAction?> = _libraryAction
 
-    // Stato wishlist per il dialog multi-select
     val wishlistsForGame: StateFlow<List<WishlistWithStatus>> =
         getWishlistsForGameUseCase(bggId).stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyList()
+        )
+
+    val rulebook: StateFlow<Rulebook?> =
+        getRulebookUseCase(bggId).stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null
         )
 
     private val _showWishlistDialog = MutableStateFlow(false)
@@ -69,9 +84,21 @@ class GameDetailViewModel @Inject constructor(
     private val _showNumPlaysSheet = MutableStateFlow(false)
     val showNumPlaysSheet: StateFlow<Boolean> = _showNumPlaysSheet.asStateFlow()
 
+    private val _showDeleteRulebookDialog = MutableStateFlow(false)
+    val showDeleteRulebookDialog: StateFlow<Boolean> = _showDeleteRulebookDialog.asStateFlow()
+
+    /** URI ricevuto via ACTION_SEND, in attesa di conferma utente */
+    private val _pendingImport = MutableStateFlow<Pair<Uri, String>?>(null)
+    val pendingImport: StateFlow<Pair<Uri, String>?> = _pendingImport.asStateFlow()
+
+    private val _isImporting = MutableStateFlow(false)
+    val isImporting: StateFlow<Boolean> = _isImporting.asStateFlow()
+
     init {
         userPreferences.addRecentlyViewed(bggId)
         loadGame()
+        // Controlla se c'è un PDF in attesa (condivisione via ACTION_SEND)
+        PendingPdfHolder.consume()?.let { _pendingImport.value = it }
     }
 
     private fun loadGame() {
@@ -119,6 +146,47 @@ class GameDetailViewModel @Inject constructor(
             }
         }
     }
+
+    // ─── Rulebook ────────────────────────────────────────────────────────────────
+
+    fun importRulebook(uri: Uri, fileName: String) {
+        viewModelScope.launch {
+            _isImporting.value = true
+            importRulebookUseCase(uri, bggId, fileName)
+                .onSuccess {
+                    snackbarController.sendEvent(SnackbarEvent("Regolamento importato (${it.pageCount} pagine)"))
+                }
+                .onFailure {
+                    snackbarController.sendEvent(SnackbarEvent("Errore import: ${it.message}"))
+                }
+            _isImporting.value = false
+        }
+    }
+
+    /** Chiamato quando l'utente conferma l'import da ACTION_SEND */
+    fun confirmPendingImport() {
+        val pending = _pendingImport.value ?: return
+        _pendingImport.value = null
+        importRulebook(pending.first, pending.second)
+    }
+
+    fun dismissPendingImport() {
+        _pendingImport.value = null
+    }
+
+    fun openDeleteRulebookDialog() { _showDeleteRulebookDialog.value = true }
+    fun dismissDeleteRulebookDialog() { _showDeleteRulebookDialog.value = false }
+
+    fun deleteRulebook() {
+        viewModelScope.launch {
+            _showDeleteRulebookDialog.value = false
+            deleteRulebookUseCase(bggId)
+                .onSuccess { snackbarController.sendEvent(SnackbarEvent("Regolamento rimosso")) }
+                .onFailure { snackbarController.sendEvent(SnackbarEvent("Errore durante la rimozione")) }
+        }
+    }
+
+    // ─── Wishlist / Rating / NumPlays ─────────────────────────────────────────
 
     fun retry() { loadGame() }
 

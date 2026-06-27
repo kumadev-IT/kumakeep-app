@@ -2,6 +2,8 @@ package com.kumadev.kumakeep.presentation.gamedetail
 
 import android.os.Build
 import android.text.Html
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,12 +27,14 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Groups
-import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.Favorite
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.BottomAppBar
@@ -43,6 +47,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -60,6 +65,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -69,6 +75,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.LibraryEntry
+import com.kumadev.kumakeep.domain.model.Rulebook
 import com.kumadev.kumakeep.domain.model.WishlistWithStatus
 import com.kumadev.kumakeep.presentation.theme.AccentGreen
 import com.kumadev.kumakeep.presentation.theme.AccentOrange
@@ -80,6 +87,7 @@ import com.kumadev.kumakeep.presentation.theme.SurfaceVariant
 fun GameDetailScreen(
     bggId: Long,
     onBack: () -> Unit,
+    onOpenRulebook: (gameId: Long) -> Unit,
     viewModel: GameDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -87,6 +95,25 @@ fun GameDetailScreen(
     val wishlistsForGame by viewModel.wishlistsForGame.collectAsStateWithLifecycle()
     val showRatingSheet by viewModel.showRatingSheet.collectAsStateWithLifecycle()
     val showNumPlaysSheet by viewModel.showNumPlaysSheet.collectAsStateWithLifecycle()
+    val rulebook by viewModel.rulebook.collectAsStateWithLifecycle()
+    val showDeleteRulebookDialog by viewModel.showDeleteRulebookDialog.collectAsStateWithLifecycle()
+    val pendingImport by viewModel.pendingImport.collectAsStateWithLifecycle()
+    val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
+
+    val context = LocalContext.current
+
+    // Launcher SAF per scegliere un PDF
+    val pdfPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        val fileName = context.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            cursor.moveToFirst()
+            if (nameIndex >= 0) cursor.getString(nameIndex) else null
+        } ?: "regolamento.pdf"
+        viewModel.importRulebook(uri, fileName)
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -118,10 +145,15 @@ fun GameDetailScreen(
             if (state is GameDetailUiState.Success) {
                 GameDetailBottomBar(
                     game = state.game,
+                    rulebook = rulebook,
                     onLibraryClick = viewModel::toggleLibrary,
                     onWishlistClick = viewModel::openWishlistDialog,
                     onRatingClick = viewModel::openRatingSheet,
-                    onNumPlaysClick = viewModel::openNumPlaysSheet
+                    onNumPlaysClick = viewModel::openNumPlaysSheet,
+                    onRulebookClick = {
+                        if (rulebook != null) onOpenRulebook(bggId)
+                        else pdfPickerLauncher.launch("application/pdf")
+                    }
                 )
             }
         }
@@ -150,6 +182,11 @@ fun GameDetailScreen(
             is GameDetailUiState.Success -> {
                 GameDetailContent(
                     game = state.game,
+                    rulebook = rulebook,
+                    isImporting = isImporting,
+                    onImportClick = { pdfPickerLauncher.launch("application/pdf") },
+                    onOpenRulebookClick = { onOpenRulebook(bggId) },
+                    onDeleteRulebookClick = viewModel::openDeleteRulebookDialog,
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -180,6 +217,45 @@ fun GameDetailScreen(
             onDismiss = viewModel::dismissNumPlaysSheet
         )
     }
+
+    if (showDeleteRulebookDialog) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissDeleteRulebookDialog,
+            title = { Text("Rimuovi regolamento") },
+            text = { Text("Il file verrà eliminato dall'app. Puoi reimportarlo in qualsiasi momento.") },
+            confirmButton = {
+                TextButton(onClick = viewModel::deleteRulebook) {
+                    Text("Rimuovi", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissDeleteRulebookDialog) { Text("Annulla") }
+            }
+        )
+    }
+
+    // Dialog per import via ACTION_SEND
+    val pending = pendingImport
+    if (pending != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissPendingImport,
+            title = { Text("Importa regolamento") },
+            text = {
+                Text(
+                    "Vuoi importare \"${pending.second}\" come regolamento di questo gioco?" +
+                            if (rulebook != null) "\n\nSostituirà il regolamento già importato." else ""
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmPendingImport) {
+                    Text("Importa", color = AccentOrange)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissPendingImport) { Text("Annulla") }
+            }
+        )
+    }
 }
 
 // ─── Bottom action bar ────────────────────────────────────────────────────────
@@ -187,10 +263,12 @@ fun GameDetailScreen(
 @Composable
 private fun GameDetailBottomBar(
     game: BoardGame,
+    rulebook: Rulebook?,
     onLibraryClick: () -> Unit,
     onWishlistClick: () -> Unit,
     onRatingClick: () -> Unit,
-    onNumPlaysClick: () -> Unit
+    onNumPlaysClick: () -> Unit,
+    onRulebookClick: () -> Unit
 ) {
     val inLibrary = game.libraryEntry != null
     val rateLabel = game.libraryEntry?.rate?.toRateLabel()
@@ -235,11 +313,10 @@ private fun GameDetailBottomBar(
                 onClick = onNumPlaysClick
             )
             BottomBarItem(
-                icon = Icons.Default.Label,
-                label = "Tag",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                enabled = false,
-                onClick = {}
+                icon = Icons.Default.MenuBook,
+                label = "Regole",
+                tint = if (rulebook != null) AccentOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = onRulebookClick
             )
         }
     }
@@ -276,6 +353,11 @@ private fun BottomBarItem(
 @Composable
 private fun GameDetailContent(
     game: BoardGame,
+    rulebook: Rulebook?,
+    isImporting: Boolean,
+    onImportClick: () -> Unit,
+    onOpenRulebookClick: () -> Unit,
+    onDeleteRulebookClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -382,6 +464,19 @@ private fun GameDetailContent(
                 UserBadgesSection(entry)
             }
 
+            // Sezione Regolamento
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = SurfaceVariant)
+            Spacer(Modifier.height(12.dp))
+
+            RulebookSection(
+                rulebook = rulebook,
+                isImporting = isImporting,
+                onImportClick = onImportClick,
+                onOpenClick = onOpenRulebookClick,
+                onDeleteClick = onDeleteRulebookClick
+            )
+
             // Descrizione
             if (!game.description.isNullOrBlank()) {
                 Spacer(Modifier.height(16.dp))
@@ -416,6 +511,97 @@ private fun GameDetailContent(
     }
 }
 
+// ─── Sezione Regolamento ──────────────────────────────────────────────────────
+
+@Composable
+private fun RulebookSection(
+    rulebook: Rulebook?,
+    isImporting: Boolean,
+    onImportClick: () -> Unit,
+    onOpenClick: () -> Unit,
+    onDeleteClick: () -> Unit
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.MenuBook,
+                contentDescription = null,
+                tint = AccentOrange,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                "Regolamento",
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+
+        when {
+            isImporting -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = AccentOrange
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        "Importazione in corso…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            rulebook != null -> {
+                Text(
+                    text = rulebook.fileName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = "${rulebook.pageCount} pagine · ${rulebook.sizeBytes.toReadableSize()}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    FilledTonalButton(onClick = onOpenClick) {
+                        Text("Apri", style = MaterialTheme.typography.labelMedium)
+                    }
+                    OutlinedButton(onClick = onImportClick) {
+                        Text("Sostituisci", style = MaterialTheme.typography.labelMedium)
+                    }
+                    IconButton(onClick = onDeleteClick, modifier = Modifier.size(36.dp)) {
+                        Icon(
+                            Icons.Default.Delete,
+                            contentDescription = "Rimuovi regolamento",
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+            }
+
+            else -> {
+                Text(
+                    text = "Nessun regolamento importato.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                FilledTonalButton(onClick = onImportClick) {
+                    Text("Importa PDF", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+    }
+}
+
 // ─── Badge sezione utente ─────────────────────────────────────────────────────
 
 @Composable
@@ -423,14 +609,12 @@ private fun UserBadgesSection(entry: LibraryEntry) {
     val rateLabel = entry.rate.toRateLabel()
     val numPlaysLabel = entry.numPlays.toNumPlaysLabel()
 
-    // Ometti la sezione se non c'è nulla da mostrare
     if (rateLabel == null && numPlaysLabel == null) return
 
     Spacer(Modifier.height(16.dp))
     HorizontalDivider(color = SurfaceVariant)
     Spacer(Modifier.height(12.dp))
 
-    // Riga 1: rating + numPlays
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         rateLabel?.let { label ->
             AssistChip(
@@ -465,7 +649,6 @@ private fun UserBadgesSection(entry: LibraryEntry) {
             )
         }
     }
-    // Riga 2: tag utente (future feature)
 }
 
 // ─── Sheet valutazione ────────────────────────────────────────────────────────
@@ -668,6 +851,14 @@ private fun String.toNumPlaysLabel(): String? = when (this) {
     "MANY" -> "Alcune"
     "PLENTY" -> "Tante"
     else -> null
+}
+
+private fun Long.toReadableSize(): String {
+    return when {
+        this < 1_024 -> "$this B"
+        this < 1_048_576 -> "${this / 1_024} KB"
+        else -> String.format("%.1f MB", this / 1_048_576.0)
+    }
 }
 
 @Suppress("DEPRECATION")

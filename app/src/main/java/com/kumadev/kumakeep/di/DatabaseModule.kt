@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.kumadev.kumakeep.data.local.KumaKeepDatabase
 import com.kumadev.kumakeep.data.local.dao.BoardGameDao
 import com.kumadev.kumakeep.data.local.dao.LibraryDao
+import com.kumadev.kumakeep.data.local.dao.RulebookDao
 import com.kumadev.kumakeep.data.local.dao.WishlistDao
 import dagger.Module
 import dagger.Provides
@@ -25,7 +26,7 @@ object DatabaseModule {
             KumaKeepDatabase::class.java,
             "kumakeep.db"
         )
-            .addMigrations(KumaKeepDatabase.MIGRATION_1_2)
+            .addMigrations(KumaKeepDatabase.MIGRATION_1_2, KumaKeepDatabase.MIGRATION_2_3)
             .build()
     }
 
@@ -40,4 +41,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideWishlistDao(db: KumaKeepDatabase): WishlistDao = db.wishlistDao()
+
+    @Provides
+    @Singleton
+    fun provideRulebookDao(db: KumaKeepDatabase): RulebookDao = db.rulebookDao()
 }

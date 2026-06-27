@@ -9,6 +9,8 @@ import androidx.navigation.navArgument
 import com.kumadev.kumakeep.presentation.gamedetail.GameDetailScreen
 import com.kumadev.kumakeep.presentation.home.HomeScreen
 import com.kumadev.kumakeep.presentation.library.LibraryScreen
+import com.kumadev.kumakeep.presentation.navigation.Screen
+import com.kumadev.kumakeep.presentation.pdfviewer.PdfViewerScreen
 import com.kumadev.kumakeep.presentation.search.SearchScreen
 import com.kumadev.kumakeep.presentation.settings.SettingsScreen
 import com.kumadev.kumakeep.presentation.wishlist.WishlistScreen
@@ -52,6 +54,18 @@ fun KumaKeepNavGraph(navController: NavHostController) {
             val bggId = backStackEntry.arguments?.getLong("bggId") ?: return@composable
             GameDetailScreen(
                 bggId = bggId,
+                onBack = { navController.popBackStack() },
+                onOpenRulebook = { gameId ->
+                    navController.navigate(Screen.PdfViewer.createRoute(gameId))
+                }
+            )
+        }
+
+        composable(
+            route = Screen.PdfViewer.route,
+            arguments = listOf(navArgument("gameId") { type = NavType.LongType })
+        ) {
+            PdfViewerScreen(
                 onBack = { navController.popBackStack() }
             )
         }
