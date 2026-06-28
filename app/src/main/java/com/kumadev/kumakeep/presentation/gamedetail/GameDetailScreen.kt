@@ -81,6 +81,7 @@ import com.kumadev.kumakeep.presentation.theme.AccentGreen
 import com.kumadev.kumakeep.presentation.theme.AccentOrange
 import com.kumadev.kumakeep.presentation.theme.SurfaceDark
 import com.kumadev.kumakeep.presentation.theme.SurfaceVariant
+import com.kumadev.rulesreader.model.ProcessingState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,6 +89,9 @@ fun GameDetailScreen(
     bggId: Long,
     onBack: () -> Unit,
     onOpenRulebook: (gameId: Long) -> Unit,
+    onInspectRulebook: (gameId: Long) -> Unit,
+    onLearnGame: (gameId: Long) -> Unit,
+    onChatRulebook: (gameId: Long) -> Unit,
     viewModel: GameDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -99,6 +103,9 @@ fun GameDetailScreen(
     val showDeleteRulebookDialog by viewModel.showDeleteRulebookDialog.collectAsStateWithLifecycle()
     val pendingImport by viewModel.pendingImport.collectAsStateWithLifecycle()
     val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
+    val processingState by viewModel.rulebookProcessingState.collectAsStateWithLifecycle()
+    val hasLearningScreens by viewModel.hasLearningScreens.collectAsStateWithLifecycle()
+    val generationState by viewModel.generationState.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
 
@@ -184,9 +191,18 @@ fun GameDetailScreen(
                     game = state.game,
                     rulebook = rulebook,
                     isImporting = isImporting,
+                    processingState = processingState,
+                    hasLearningScreens = hasLearningScreens,
+                    generationState = generationState,
                     onImportClick = { pdfPickerLauncher.launch("application/pdf") },
                     onOpenRulebookClick = { onOpenRulebook(bggId) },
+                    onInspectRulebookClick = { onInspectRulebook(bggId) },
+                    onStartProcessingClick = viewModel::startRulebookProcessing,
+                    onResetProcessingClick = viewModel::resetRulebookProcessing,
                     onDeleteRulebookClick = viewModel::openDeleteRulebookDialog,
+                    onGenerateLearningScreens = viewModel::generateLearningScreens,
+                    onLearnGame = { onLearnGame(bggId) },
+                    onChatRulebook = { onChatRulebook(bggId) },
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -355,9 +371,18 @@ private fun GameDetailContent(
     game: BoardGame,
     rulebook: Rulebook?,
     isImporting: Boolean,
+    processingState: ProcessingState,
+    hasLearningScreens: Boolean,
+    generationState: LearningScreensGenerationState,
     onImportClick: () -> Unit,
     onOpenRulebookClick: () -> Unit,
+    onInspectRulebookClick: () -> Unit,
+    onStartProcessingClick: () -> Unit,
+    onResetProcessingClick: () -> Unit,
     onDeleteRulebookClick: () -> Unit,
+    onGenerateLearningScreens: () -> Unit,
+    onLearnGame: () -> Unit,
+    onChatRulebook: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -472,9 +497,18 @@ private fun GameDetailContent(
             RulebookSection(
                 rulebook = rulebook,
                 isImporting = isImporting,
+                processingState = processingState,
+                hasLearningScreens = hasLearningScreens,
+                generationState = generationState,
                 onImportClick = onImportClick,
                 onOpenClick = onOpenRulebookClick,
-                onDeleteClick = onDeleteRulebookClick
+                onInspectClick = onInspectRulebookClick,
+                onStartProcessingClick = onStartProcessingClick,
+                onResetProcessingClick = onResetProcessingClick,
+                onDeleteClick = onDeleteRulebookClick,
+                onGenerateLearningScreens = onGenerateLearningScreens,
+                onLearnGame = onLearnGame,
+                onChatRulebook = onChatRulebook
             )
 
             // Descrizione
@@ -517,9 +551,18 @@ private fun GameDetailContent(
 private fun RulebookSection(
     rulebook: Rulebook?,
     isImporting: Boolean,
+    processingState: ProcessingState,
+    hasLearningScreens: Boolean,
+    generationState: LearningScreensGenerationState,
     onImportClick: () -> Unit,
     onOpenClick: () -> Unit,
-    onDeleteClick: () -> Unit
+    onInspectClick: () -> Unit,
+    onStartProcessingClick: () -> Unit,
+    onResetProcessingClick: () -> Unit,
+    onDeleteClick: () -> Unit,
+    onGenerateLearningScreens: () -> Unit,
+    onLearnGame: () -> Unit,
+    onChatRulebook: () -> Unit
 ) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -585,6 +628,27 @@ private fun RulebookSection(
                         )
                     }
                 }
+
+                // ── Sezione analisi RAG ────────────────────────────────────────
+                Spacer(Modifier.height(12.dp))
+                RulebookProcessingSection(
+                    state = processingState,
+                    onStartClick = onStartProcessingClick,
+                    onInspectClick = onInspectClick,
+                    onResetClick = onResetProcessingClick
+                )
+
+                // ── Strumenti AI (visibili solo quando l'analisi è completata) ──
+                if (processingState == ProcessingState.Done) {
+                    Spacer(Modifier.height(12.dp))
+                    AiToolsSection(
+                        hasLearningScreens = hasLearningScreens,
+                        generationState = generationState,
+                        onGenerateLearningScreens = onGenerateLearningScreens,
+                        onLearnGame = onLearnGame,
+                        onChatRulebook = onChatRulebook
+                    )
+                }
             }
 
             else -> {
@@ -598,6 +662,210 @@ private fun RulebookSection(
                     Text("Importa PDF", style = MaterialTheme.typography.labelMedium)
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun RulebookProcessingSection(
+    state: ProcessingState,
+    onStartClick: () -> Unit,
+    onInspectClick: () -> Unit,
+    onResetClick: () -> Unit
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Analisi RAG",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.weight(1f))
+            when (state) {
+                ProcessingState.Done -> {
+                    TextButton(
+                        onClick = onResetClick,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            "Rianalizza",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                is ProcessingState.Error -> {
+                    TextButton(
+                        onClick = onStartClick,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            "Riprova",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+                else -> {}
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        when (state) {
+            ProcessingState.Idle -> {
+                FilledTonalButton(onClick = onStartClick) {
+                    Text("Analizza regolamento", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            ProcessingState.Extracting -> {
+                ProcessingProgressRow(label = "Estrazione testo…")
+            }
+
+            is ProcessingState.Chunking -> {
+                ProcessingProgressRow(
+                    label = "Segmentazione chunk…",
+                    progress = if (state.total > 0) state.current.toFloat() / state.total else null
+                )
+            }
+
+            is ProcessingState.Embedding -> {
+                ProcessingProgressRow(
+                    label = "Calcolo embedding ${state.current + 1}/${state.total}…",
+                    progress = if (state.total > 0) (state.current + 1).toFloat() / state.total else null
+                )
+            }
+
+            ProcessingState.Done -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "✓ Analisi completata",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AccentGreen
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                FilledTonalButton(onClick = onInspectClick) {
+                    Text("Ispeziona", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            is ProcessingState.Error -> {
+                Text(
+                    text = "Errore: ${state.message}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProcessingProgressRow(label: String, progress: Float? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (progress != null) {
+            CircularProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = AccentOrange
+            )
+        } else {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = AccentOrange
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+// ─── Strumenti AI ────────────────────────────────────────────────────────────
+
+@Composable
+private fun AiToolsSection(
+    hasLearningScreens: Boolean,
+    generationState: LearningScreensGenerationState,
+    onGenerateLearningScreens: () -> Unit,
+    onLearnGame: () -> Unit,
+    onChatRulebook: () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = "Strumenti AI",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        // ─ Schermate di apprendimento ────────────────────────────────────
+        when {
+            hasLearningScreens -> {
+                FilledTonalButton(
+                    onClick = onLearnGame,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("📖  Schermate di apprendimento", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+            generationState is LearningScreensGenerationState.Generating -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(16.dp),
+                        strokeWidth = 2.dp,
+                        color = AccentOrange
+                    )
+                    Text(
+                        "Generazione schermate…",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+            generationState is LearningScreensGenerationState.Error -> {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        "Errore generazione",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                    TextButton(onClick = onGenerateLearningScreens) {
+                        Text("Riprova", style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+            else -> {
+                OutlinedButton(
+                    onClick = onGenerateLearningScreens,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("✨  Genera schermate di apprendimento", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+
+        // ─ Chatbot ───────────────────────────────────────────────────────
+        OutlinedButton(
+            onClick = onChatRulebook,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text("💬  Chatbot regolamento", style = MaterialTheme.typography.labelMedium)
         }
     }
 }

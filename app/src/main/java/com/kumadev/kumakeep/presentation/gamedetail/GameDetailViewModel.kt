@@ -22,14 +22,28 @@ import com.kumadev.kumakeep.data.local.preferences.UserPreferences
 import com.kumadev.kumakeep.presentation.SnackbarController
 import com.kumadev.kumakeep.presentation.SnackbarEvent
 import com.kumadev.kumakeep.util.PendingPdfHolder
+import com.kumadev.rulesreader.RulesReader
+import com.kumadev.rulesreader.db.RulesReaderDatabase
+import com.kumadev.rulesreader.generator.LearningScreensGenerator
+import com.kumadev.rulesreader.llm.LlmClient
+import com.kumadev.rulesreader.model.ProcessingState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+
+sealed interface LearningScreensGenerationState {
+    data object Idle : LearningScreensGenerationState
+    data object Generating : LearningScreensGenerationState
+    data object Done : LearningScreensGenerationState
+    data class Error(val message: String) : LearningScreensGenerationState
+}
 
 sealed interface GameDetailUiState {
     data object Loading : GameDetailUiState
@@ -50,7 +64,11 @@ class GameDetailViewModel @Inject constructor(
     private val importRulebookUseCase: ImportRulebookUseCase,
     private val deleteRulebookUseCase: DeleteRulebookUseCase,
     private val snackbarController: SnackbarController,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val rulesReader: RulesReader,
+    private val learningScreensGenerator: LearningScreensGenerator,
+    private val llmClient: LlmClient,
+    private val rulesReaderDatabase: RulesReaderDatabase
 ) : ViewModel() {
 
     val bggId: Long = checkNotNull(savedStateHandle["bggId"])
@@ -74,6 +92,27 @@ class GameDetailViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = null
         )
+
+    val rulebookProcessingState: StateFlow<ProcessingState> =
+        rulesReader.getProcessingState(bggId).stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = ProcessingState.Idle
+        )
+
+    /** True se esistono già schermate di apprendimento generate per questo gioco. */
+    val hasLearningScreens: StateFlow<Boolean> =
+        rulesReaderDatabase.generatedScreenDao().observeByRulebookId(bggId)
+            .map { it.isNotEmpty() }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = false
+            )
+
+    private val _generationState =
+        MutableStateFlow<LearningScreensGenerationState>(LearningScreensGenerationState.Idle)
+    val generationState: StateFlow<LearningScreensGenerationState> = _generationState.asStateFlow()
 
     private val _showWishlistDialog = MutableStateFlow(false)
     val showWishlistDialog: StateFlow<Boolean> = _showWishlistDialog.asStateFlow()
@@ -148,6 +187,37 @@ class GameDetailViewModel @Inject constructor(
     }
 
     // ─── Rulebook ────────────────────────────────────────────────────────────────
+
+    /** Avvia la pipeline di estrazione+chunking+embedding per il regolamento corrente. */
+    fun startRulebookProcessing() {
+        val rb = rulebook.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            rulesReader.process(bggId, rb.filePath)
+        }
+    }
+
+    /** Genera le schermate di apprendimento tramite LLM (una-tantum). */
+    fun generateLearningScreens() {
+        if (_generationState.value is LearningScreensGenerationState.Generating) return
+        viewModelScope.launch(Dispatchers.IO) {
+            _generationState.value = LearningScreensGenerationState.Generating
+            try {
+                learningScreensGenerator.generate(bggId, llmClient)
+                _generationState.value = LearningScreensGenerationState.Done
+            } catch (e: Exception) {
+                val msg = e.message ?: "Errore sconosciuto"
+                _generationState.value = LearningScreensGenerationState.Error(msg)
+                snackbarController.sendEvent(SnackbarEvent("Errore generazione schermate: $msg"))
+            }
+        }
+    }
+
+    /** Resetta la pipeline per permettere una ri-elaborazione da zero. */
+    fun resetRulebookProcessing() {
+        viewModelScope.launch(Dispatchers.IO) {
+            rulesReader.reset(bggId)
+        }
+    }
 
     fun importRulebook(uri: Uri, fileName: String) {
         viewModelScope.launch {

@@ -24,4 +24,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "KumaKeep"
 include(":app")
- 
+include(":rules-reader")
