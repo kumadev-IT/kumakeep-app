@@ -117,6 +117,9 @@ dependencies {
     // Drag-to-reorder LazyColumn
     implementation(libs.reorderable)
 
+    // Rules-reader module
+    implementation(project(":rules-reader"))
+
     // Debug only
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

@@ -15,4 +15,7 @@ sealed class Screen(val route: String) {
     data object PdfViewer : Screen("pdf_viewer/{gameId}") {
         fun createRoute(gameId: Long) = "pdf_viewer/$gameId"
     }
+    data object RulesInspector : Screen("rules_inspector/{gameId}") {
+        fun createRoute(gameId: Long) = "rules_inspector/$gameId"
+    }
 }

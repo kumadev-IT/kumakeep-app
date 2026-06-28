@@ -22,7 +22,10 @@ import com.kumadev.kumakeep.data.local.preferences.UserPreferences
 import com.kumadev.kumakeep.presentation.SnackbarController
 import com.kumadev.kumakeep.presentation.SnackbarEvent
 import com.kumadev.kumakeep.util.PendingPdfHolder
+import com.kumadev.rulesreader.RulesReader
+import com.kumadev.rulesreader.model.ProcessingState
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -50,7 +53,8 @@ class GameDetailViewModel @Inject constructor(
     private val importRulebookUseCase: ImportRulebookUseCase,
     private val deleteRulebookUseCase: DeleteRulebookUseCase,
     private val snackbarController: SnackbarController,
-    private val userPreferences: UserPreferences
+    private val userPreferences: UserPreferences,
+    private val rulesReader: RulesReader
 ) : ViewModel() {
 
     val bggId: Long = checkNotNull(savedStateHandle["bggId"])
@@ -73,6 +77,13 @@ class GameDetailViewModel @Inject constructor(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = null
+        )
+
+    val rulebookProcessingState: StateFlow<ProcessingState> =
+        rulesReader.getProcessingState(bggId).stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = ProcessingState.Idle
         )
 
     private val _showWishlistDialog = MutableStateFlow(false)
@@ -148,6 +159,21 @@ class GameDetailViewModel @Inject constructor(
     }
 
     // ─── Rulebook ────────────────────────────────────────────────────────────────
+
+    /** Avvia la pipeline di estrazione+chunking+embedding per il regolamento corrente. */
+    fun startRulebookProcessing() {
+        val rb = rulebook.value ?: return
+        viewModelScope.launch(Dispatchers.IO) {
+            rulesReader.process(bggId, rb.filePath)
+        }
+    }
+
+    /** Resetta la pipeline per permettere una ri-elaborazione da zero. */
+    fun resetRulebookProcessing() {
+        viewModelScope.launch(Dispatchers.IO) {
+            rulesReader.reset(bggId)
+        }
+    }
 
     fun importRulebook(uri: Uri, fileName: String) {
         viewModelScope.launch {

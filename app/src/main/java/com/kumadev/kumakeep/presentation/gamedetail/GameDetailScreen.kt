@@ -81,6 +81,7 @@ import com.kumadev.kumakeep.presentation.theme.AccentGreen
 import com.kumadev.kumakeep.presentation.theme.AccentOrange
 import com.kumadev.kumakeep.presentation.theme.SurfaceDark
 import com.kumadev.kumakeep.presentation.theme.SurfaceVariant
+import com.kumadev.rulesreader.model.ProcessingState
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -88,6 +89,7 @@ fun GameDetailScreen(
     bggId: Long,
     onBack: () -> Unit,
     onOpenRulebook: (gameId: Long) -> Unit,
+    onInspectRulebook: (gameId: Long) -> Unit,
     viewModel: GameDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -99,6 +101,7 @@ fun GameDetailScreen(
     val showDeleteRulebookDialog by viewModel.showDeleteRulebookDialog.collectAsStateWithLifecycle()
     val pendingImport by viewModel.pendingImport.collectAsStateWithLifecycle()
     val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
+    val processingState by viewModel.rulebookProcessingState.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
 
@@ -184,8 +187,12 @@ fun GameDetailScreen(
                     game = state.game,
                     rulebook = rulebook,
                     isImporting = isImporting,
+                    processingState = processingState,
                     onImportClick = { pdfPickerLauncher.launch("application/pdf") },
                     onOpenRulebookClick = { onOpenRulebook(bggId) },
+                    onInspectRulebookClick = { onInspectRulebook(bggId) },
+                    onStartProcessingClick = viewModel::startRulebookProcessing,
+                    onResetProcessingClick = viewModel::resetRulebookProcessing,
                     onDeleteRulebookClick = viewModel::openDeleteRulebookDialog,
                     modifier = Modifier.padding(padding)
                 )
@@ -355,8 +362,12 @@ private fun GameDetailContent(
     game: BoardGame,
     rulebook: Rulebook?,
     isImporting: Boolean,
+    processingState: ProcessingState,
     onImportClick: () -> Unit,
     onOpenRulebookClick: () -> Unit,
+    onInspectRulebookClick: () -> Unit,
+    onStartProcessingClick: () -> Unit,
+    onResetProcessingClick: () -> Unit,
     onDeleteRulebookClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -472,8 +483,12 @@ private fun GameDetailContent(
             RulebookSection(
                 rulebook = rulebook,
                 isImporting = isImporting,
+                processingState = processingState,
                 onImportClick = onImportClick,
                 onOpenClick = onOpenRulebookClick,
+                onInspectClick = onInspectRulebookClick,
+                onStartProcessingClick = onStartProcessingClick,
+                onResetProcessingClick = onResetProcessingClick,
                 onDeleteClick = onDeleteRulebookClick
             )
 
@@ -517,8 +532,12 @@ private fun GameDetailContent(
 private fun RulebookSection(
     rulebook: Rulebook?,
     isImporting: Boolean,
+    processingState: ProcessingState,
     onImportClick: () -> Unit,
     onOpenClick: () -> Unit,
+    onInspectClick: () -> Unit,
+    onStartProcessingClick: () -> Unit,
+    onResetProcessingClick: () -> Unit,
     onDeleteClick: () -> Unit
 ) {
     Column {
@@ -585,6 +604,15 @@ private fun RulebookSection(
                         )
                     }
                 }
+
+                // ── Sezione analisi RAG ────────────────────────────────────────
+                Spacer(Modifier.height(12.dp))
+                RulebookProcessingSection(
+                    state = processingState,
+                    onStartClick = onStartProcessingClick,
+                    onInspectClick = onInspectClick,
+                    onResetClick = onResetProcessingClick
+                )
             }
 
             else -> {
@@ -599,6 +627,130 @@ private fun RulebookSection(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun RulebookProcessingSection(
+    state: ProcessingState,
+    onStartClick: () -> Unit,
+    onInspectClick: () -> Unit,
+    onResetClick: () -> Unit
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = "Analisi RAG",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.weight(1f))
+            when (state) {
+                ProcessingState.Done -> {
+                    TextButton(
+                        onClick = onResetClick,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            "Rianalizza",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                is ProcessingState.Error -> {
+                    TextButton(
+                        onClick = onStartClick,
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp)
+                    ) {
+                        Text(
+                            "Riprova",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
+                }
+                else -> {}
+            }
+        }
+
+        Spacer(Modifier.height(6.dp))
+
+        when (state) {
+            ProcessingState.Idle -> {
+                FilledTonalButton(onClick = onStartClick) {
+                    Text("Analizza regolamento", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            ProcessingState.Extracting -> {
+                ProcessingProgressRow(label = "Estrazione testo…")
+            }
+
+            is ProcessingState.Chunking -> {
+                ProcessingProgressRow(
+                    label = "Segmentazione chunk…",
+                    progress = if (state.total > 0) state.current.toFloat() / state.total else null
+                )
+            }
+
+            is ProcessingState.Embedding -> {
+                ProcessingProgressRow(
+                    label = "Calcolo embedding ${state.current + 1}/${state.total}…",
+                    progress = if (state.total > 0) (state.current + 1).toFloat() / state.total else null
+                )
+            }
+
+            ProcessingState.Done -> {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "✓ Analisi completata",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = AccentGreen
+                    )
+                }
+                Spacer(Modifier.height(8.dp))
+                FilledTonalButton(onClick = onInspectClick) {
+                    Text("Ispeziona", style = MaterialTheme.typography.labelMedium)
+                }
+            }
+
+            is ProcessingState.Error -> {
+                Text(
+                    text = "Errore: ${state.message}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProcessingProgressRow(label: String, progress: Float? = null) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (progress != null) {
+            CircularProgressIndicator(
+                progress = { progress },
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = AccentOrange
+            )
+        } else {
+            CircularProgressIndicator(
+                modifier = Modifier.size(16.dp),
+                strokeWidth = 2.dp,
+                color = AccentOrange
+            )
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
