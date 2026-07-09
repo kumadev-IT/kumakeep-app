@@ -1,5 +1,7 @@
 package com.kumadev.kumakeep.presentation.gamedetail
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.text.Html
 import androidx.compose.foundation.background
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Replay
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Star
@@ -60,6 +63,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -278,6 +282,7 @@ private fun GameDetailContent(
     game: BoardGame,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -409,6 +414,29 @@ private fun GameDetailContent(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+            }
+
+            // Link a BoardGameGeek
+            Spacer(Modifier.height(16.dp))
+            HorizontalDivider(color = SurfaceVariant)
+            Spacer(Modifier.height(16.dp))
+            FilledTonalButton(
+                onClick = {
+                    val intent = Intent(
+                        Intent.ACTION_VIEW,
+                        Uri.parse("https://boardgamegeek.com/boardgame/${game.bggId}")
+                    )
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    Icons.Default.OpenInNew,
+                    contentDescription = null,
+                    modifier = Modifier.size(18.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("Apri su BoardGameGeek")
             }
 
             Spacer(Modifier.height(16.dp))
