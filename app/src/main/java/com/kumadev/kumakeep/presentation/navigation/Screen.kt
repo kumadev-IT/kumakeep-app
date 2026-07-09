@@ -18,10 +18,4 @@ sealed class Screen(val route: String) {
     data object RulesInspector : Screen("rules_inspector/{gameId}") {
         fun createRoute(gameId: Long) = "rules_inspector/$gameId"
     }
-    data object LearningScreens : Screen("learning_screens/{gameId}") {
-        fun createRoute(gameId: Long) = "learning_screens/$gameId"
-    }
-    data object RulebookChat : Screen("rulebook_chat/{gameId}") {
-        fun createRoute(gameId: Long) = "rulebook_chat/$gameId"
-    }
 }

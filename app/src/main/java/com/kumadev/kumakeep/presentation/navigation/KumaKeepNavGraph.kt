@@ -14,8 +14,6 @@ import com.kumadev.kumakeep.presentation.search.SearchScreen
 import com.kumadev.kumakeep.presentation.settings.SettingsScreen
 import com.kumadev.kumakeep.presentation.wishlist.WishlistScreen
 import com.kumadev.kumakeep.presentation.wishlistdetail.WishlistDetailScreen
-import com.kumadev.rulesreader.ui.LearningScreensScreen
-import com.kumadev.rulesreader.ui.RulebookChatScreen
 import com.kumadev.rulesreader.ui.RulesInspectorScreen
 
 @Composable
@@ -62,12 +60,6 @@ fun KumaKeepNavGraph(navController: NavHostController) {
                 },
                 onInspectRulebook = { gameId ->
                     navController.navigate(Screen.RulesInspector.createRoute(gameId))
-                },
-                onLearnGame = { gameId ->
-                    navController.navigate(Screen.LearningScreens.createRoute(gameId))
-                },
-                onChatRulebook = { gameId ->
-                    navController.navigate(Screen.RulebookChat.createRoute(gameId))
                 }
             )
         }
@@ -86,24 +78,6 @@ fun KumaKeepNavGraph(navController: NavHostController) {
             arguments = listOf(navArgument("gameId") { type = NavType.LongType })
         ) {
             PdfViewerScreen(
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(
-            route = Screen.LearningScreens.route,
-            arguments = listOf(navArgument("gameId") { type = NavType.LongType })
-        ) {
-            LearningScreensScreen(
-                onBack = { navController.popBackStack() }
-            )
-        }
-
-        composable(
-            route = Screen.RulebookChat.route,
-            arguments = listOf(navArgument("gameId") { type = NavType.LongType })
-        ) {
-            RulebookChatScreen(
                 onBack = { navController.popBackStack() }
             )
         }

@@ -27,11 +27,6 @@ object RulesReaderModule {
             context,
             RulesReaderDatabase::class.java,
             RulesReaderDatabase.DATABASE_NAME
-        )
-            .addMigrations(
-                RulesReaderDatabase.MIGRATION_1_2,
-                RulesReaderDatabase.MIGRATION_2_3
-            )
-            .build()
+        ).build()
     }
 }

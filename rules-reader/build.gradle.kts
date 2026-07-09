@@ -44,18 +44,8 @@ android {
 
     testOptions {
         unitTests.all {
-            // Forwarda le property -P dalla riga di comando al JVM del test
+            // Forwarda -Ppdf.path dalla riga di comando al JVM del test
             it.systemProperties["pdf.path"] = project.findProperty("pdf.path")?.toString() ?: ""
-            // Opzionali: per il tool schermate di apprendimento con LLM reale
-            it.systemProperties["gemini.key"] = project.findProperty("gemini.key")?.toString() ?: ""
-            it.systemProperties["gemini.model"] = project.findProperty("gemini.model")?.toString() ?: ""
-            // Mostra i println del test (report di ispezione) sulla console
-            it.testLogging {
-                showStandardStreams = true
-                events("passed", "skipped", "failed")
-            }
-            // Il test di ispezione va sempre rieseguito (altrimenti resta UP-TO-DATE e non stampa)
-            it.outputs.upToDateWhen { false }
         }
     }
 }
@@ -109,7 +99,4 @@ dependencies {
     testImplementation(libs.junit)
     testImplementation(libs.pdfbox.jvm) // Apache PDFBox puro — non Android, per test locali
     testImplementation(libs.kotlinx.coroutines.test)
-    // org.json reale (su JVM le classi di android.jar sono stub che lanciano): serve al tool
-    // schermate di apprendimento per parsare la risposta LLM.
-    testImplementation("org.json:json:20240303")
 }

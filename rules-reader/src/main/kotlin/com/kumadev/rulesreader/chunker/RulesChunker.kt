@@ -6,147 +6,63 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Structure-Aware Chunker (Fase 1).
+ * Segmenta il testo estratto in chunk con sliding window + overlap,
+ * preservando il numero di pagina di origine per ogni chunk.
  *
- * Usa i confini logici di [SectionDetector] come punti di taglio **preferenziali**, ma con una
- * politica di accumulo che garantisce chunk di dimensione utile all'embedding anche su
- * regolamenti con estrazione PDF rumorosa (etichette mappa, testo grafico MAIUSCOLO, ecc.).
+ * Algoritmo word-based (non tokenizer):
+ * - Chunk target: [CHUNK_WORDS] parole (~500)
+ * - Overlap: [OVERLAP_WORDS] parole (~100) → finestra scorrevole
  *
- * Politica:
- * - Le sezioni vengono accumulate in un buffer; il buffer viene emesso come chunk **solo a un
- *   confine di sezione** e **solo** quando ha raggiunto [TARGET_WORDS]. Così i confini dei chunk
- *   si allineano ai titoli reali senza produrre micro-chunk da 1–2 parole quando il detector
- *   sovra-segmenta.
- * - A ogni chunk viene assegnato il `sectionType` **dominante** (il tipo che contribuisce più
- *   parole; i tipi noti prevalgono su UNKNOWN).
- * - Una singola sezione più grande di [MAX_SECTION_WORDS] viene sotto-suddivisa con sliding
- *   window ([CHUNK_WORDS]/[OVERLAP_WORDS]) — fallback interno per sezioni molto lunghe.
- *
- * Se il documento non ha struttura riconoscibile, [SectionDetector] restituisce un'unica sezione
- * [SectionType.UNKNOWN] e il comportamento degenera in sliding window puro.
+ * Le pagine vuote vengono saltate.
  */
 @Singleton
-class RulesChunker @Inject constructor(
-    private val sectionDetector: SectionDetector
-) {
+class RulesChunker @Inject constructor() {
 
     companion object {
         const val CHUNK_WORDS = 500
         const val OVERLAP_WORDS = 100
-
-        /** Dimensione target del buffer: raggiunta, si emette al confine di sezione successivo. */
-        const val TARGET_WORDS = 350
-
-        /** Oltre questa soglia una singola sezione viene sotto-suddivisa con sliding window. */
-        const val MAX_SECTION_WORDS = 500
-
-        /** Coda residua minima nello sliding window: sotto questa soglia si interrompe. */
-        const val MIN_TAIL_WORDS = 20
-
-        /**
-         * Quota minima di parole che un tipo noto deve occupare in un chunk per etichettarlo.
-         * Sotto questa soglia il chunk resta UNKNOWN: evita che una micro-intestazione
-         * (es. un'intestazione di tabella "Action Result…") dirotti l'etichetta di un chunk
-         * grande e per lo più non strutturato (es. l'introduzione narrativa).
-         */
-        const val SECTION_LABEL_MIN_SHARE = 0.20
-
-        private val WHITESPACE = Regex("\\s+")
     }
-
-    private data class WordEntry(val word: String, val pageNum: Int)
 
     /**
      * @param pages Lista ordinata per pageNum di pagine estratte.
-     * @return Lista di [RulesChunk] con indice progressivo, numero di pagina e sectionType.
+     * @return Lista di [RulesChunk] con indice progressivo e numero di pagina.
      */
     fun chunk(pages: List<ExtractedPage>): List<RulesChunk> {
-        val sections = sectionDetector.detect(pages)
-        if (sections.isEmpty()) return emptyList()
+        // Costruisce una sequenza flat di (word, pageNum)
+        data class WordEntry(val word: String, val pageNum: Int)
+
+        val words: List<WordEntry> = pages
+            .filter { it.rawText.isNotBlank() }
+            .flatMap { page ->
+                page.rawText.split(Regex("\\s+"))
+                    .filter { it.isNotEmpty() }
+                    .map { WordEntry(it, page.pageNum) }
+            }
+
+        if (words.isEmpty()) return emptyList()
 
         val chunks = mutableListOf<RulesChunk>()
+        var start = 0
         var chunkIndex = 0
 
-        val buffer = mutableListOf<WordEntry>()
-        val typeWords = HashMap<String, Int>()
-
-        fun flush() {
-            if (buffer.isEmpty()) return
-            chunks.add(buildChunk(chunkIndex++, buffer, dominantType(typeWords)))
-            buffer.clear()
-            typeWords.clear()
-        }
-
-        for (section in sections) {
-            val words: List<WordEntry> = section.lines.flatMap { line ->
-                line.text.split(WHITESPACE)
-                    .filter { it.isNotEmpty() }
-                    .map { WordEntry(it, line.pageNum) }
-            }
-            if (words.isEmpty()) continue
-
-            if (words.size > MAX_SECTION_WORDS) {
-                // Sezione troppo grande: chiude il buffer e la sotto-suddivide con sliding window.
-                flush()
-                slidingWindow(words) { slice ->
-                    chunks.add(buildChunk(chunkIndex++, slice, section.sectionType))
-                }
-                continue
-            }
-
-            buffer.addAll(words)
-            typeWords[section.sectionType] = (typeWords[section.sectionType] ?: 0) + words.size
-
-            // Emette solo a confine di sezione (qui, tra una sezione e la successiva) quando pieno.
-            if (buffer.size >= TARGET_WORDS) flush()
-        }
-        flush()
-
-        return chunks
-    }
-
-    /** Sliding window con overlap interno a una sezione grande. */
-    private inline fun slidingWindow(
-        words: List<WordEntry>,
-        emit: (List<WordEntry>) -> Unit
-    ) {
-        var start = 0
         while (start < words.size) {
             val end = minOf(start + CHUNK_WORDS, words.size)
-            emit(words.subList(start, end))
+            val slice = words.subList(start, end)
 
-            start += CHUNK_WORDS - OVERLAP_WORDS
-            // La coda residua rientra già nell'overlap del chunk precedente: stop.
-            if (start < words.size && (words.size - start) < MIN_TAIL_WORDS) break
+            val text = slice.joinToString(" ") { it.word }
+            val pageNum = slice.first().pageNum
+
+            chunks.add(RulesChunk(index = chunkIndex, pageNum = pageNum, text = text))
+            chunkIndex++
+
+            // Avanza di (CHUNK_WORDS - OVERLAP_WORDS) → sliding window
+            val step = CHUNK_WORDS - OVERLAP_WORDS
+            start += step
+
+            // Evita chunk finali troppo piccoli (< 20 parole): li fondiamo all'ultimo
+            if (start < words.size && (words.size - start) < 20) break
         }
-    }
 
-    private fun buildChunk(index: Int, words: List<WordEntry>, sectionType: String): RulesChunk =
-        RulesChunk(
-            index = index,
-            pageNum = words.first().pageNum,
-            text = words.joinToString(" ") { it.word },
-            sectionType = sectionType
-        )
-
-    /**
-     * Tipo dominante di un buffer: il tipo noto (≠ UNKNOWN) con più parole, ma solo se occupa
-     * almeno [SECTION_LABEL_MIN_SHARE] delle parole totali del chunk; altrimenti UNKNOWN.
-     * In questo modo una sezione SETUP sostanziale circondata da etichette non classificate
-     * resta SETUP, mentre una micro-intestazione dentro un chunk grande non lo dirotta.
-     */
-    private fun dominantType(typeWords: Map<String, Int>): String {
-        if (typeWords.isEmpty()) return SectionType.UNKNOWN
-        val total = typeWords.values.sum()
-        if (total == 0) return SectionType.UNKNOWN
-        val bestKnown = typeWords.entries
-            .filter { it.key != SectionType.UNKNOWN }
-            .maxByOrNull { it.value }
-            ?: return SectionType.UNKNOWN
-        return if (bestKnown.value.toDouble() / total >= SECTION_LABEL_MIN_SHARE) {
-            bestKnown.key
-        } else {
-            SectionType.UNKNOWN
-        }
+        return chunks
     }
 }

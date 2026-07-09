@@ -139,7 +139,6 @@ class RulesReader @Inject constructor(
                         chunkIndex = chunk.index,
                         pageNum = chunk.pageNum,
                         text = chunk.text,
-                        sectionType = chunk.sectionType,
                         embeddingBlob = blob,
                         rulesReaderVersion = BuildConfig.RULES_READER_VERSION
                     )

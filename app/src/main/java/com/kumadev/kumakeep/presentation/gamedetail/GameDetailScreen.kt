@@ -90,8 +90,6 @@ fun GameDetailScreen(
     onBack: () -> Unit,
     onOpenRulebook: (gameId: Long) -> Unit,
     onInspectRulebook: (gameId: Long) -> Unit,
-    onLearnGame: (gameId: Long) -> Unit,
-    onChatRulebook: (gameId: Long) -> Unit,
     viewModel: GameDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -104,8 +102,6 @@ fun GameDetailScreen(
     val pendingImport by viewModel.pendingImport.collectAsStateWithLifecycle()
     val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
     val processingState by viewModel.rulebookProcessingState.collectAsStateWithLifecycle()
-    val hasLearningScreens by viewModel.hasLearningScreens.collectAsStateWithLifecycle()
-    val generationState by viewModel.generationState.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
 
@@ -192,17 +188,12 @@ fun GameDetailScreen(
                     rulebook = rulebook,
                     isImporting = isImporting,
                     processingState = processingState,
-                    hasLearningScreens = hasLearningScreens,
-                    generationState = generationState,
                     onImportClick = { pdfPickerLauncher.launch("application/pdf") },
                     onOpenRulebookClick = { onOpenRulebook(bggId) },
                     onInspectRulebookClick = { onInspectRulebook(bggId) },
                     onStartProcessingClick = viewModel::startRulebookProcessing,
                     onResetProcessingClick = viewModel::resetRulebookProcessing,
                     onDeleteRulebookClick = viewModel::openDeleteRulebookDialog,
-                    onGenerateLearningScreens = viewModel::generateLearningScreens,
-                    onLearnGame = { onLearnGame(bggId) },
-                    onChatRulebook = { onChatRulebook(bggId) },
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -372,17 +363,12 @@ private fun GameDetailContent(
     rulebook: Rulebook?,
     isImporting: Boolean,
     processingState: ProcessingState,
-    hasLearningScreens: Boolean,
-    generationState: LearningScreensGenerationState,
     onImportClick: () -> Unit,
     onOpenRulebookClick: () -> Unit,
     onInspectRulebookClick: () -> Unit,
     onStartProcessingClick: () -> Unit,
     onResetProcessingClick: () -> Unit,
     onDeleteRulebookClick: () -> Unit,
-    onGenerateLearningScreens: () -> Unit,
-    onLearnGame: () -> Unit,
-    onChatRulebook: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -498,17 +484,12 @@ private fun GameDetailContent(
                 rulebook = rulebook,
                 isImporting = isImporting,
                 processingState = processingState,
-                hasLearningScreens = hasLearningScreens,
-                generationState = generationState,
                 onImportClick = onImportClick,
                 onOpenClick = onOpenRulebookClick,
                 onInspectClick = onInspectRulebookClick,
                 onStartProcessingClick = onStartProcessingClick,
                 onResetProcessingClick = onResetProcessingClick,
-                onDeleteClick = onDeleteRulebookClick,
-                onGenerateLearningScreens = onGenerateLearningScreens,
-                onLearnGame = onLearnGame,
-                onChatRulebook = onChatRulebook
+                onDeleteClick = onDeleteRulebookClick
             )
 
             // Descrizione
@@ -552,17 +533,12 @@ private fun RulebookSection(
     rulebook: Rulebook?,
     isImporting: Boolean,
     processingState: ProcessingState,
-    hasLearningScreens: Boolean,
-    generationState: LearningScreensGenerationState,
     onImportClick: () -> Unit,
     onOpenClick: () -> Unit,
     onInspectClick: () -> Unit,
     onStartProcessingClick: () -> Unit,
     onResetProcessingClick: () -> Unit,
-    onDeleteClick: () -> Unit,
-    onGenerateLearningScreens: () -> Unit,
-    onLearnGame: () -> Unit,
-    onChatRulebook: () -> Unit
+    onDeleteClick: () -> Unit
 ) {
     Column {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -637,18 +613,6 @@ private fun RulebookSection(
                     onInspectClick = onInspectClick,
                     onResetClick = onResetProcessingClick
                 )
-
-                // ── Strumenti AI (visibili solo quando l'analisi è completata) ──
-                if (processingState == ProcessingState.Done) {
-                    Spacer(Modifier.height(12.dp))
-                    AiToolsSection(
-                        hasLearningScreens = hasLearningScreens,
-                        generationState = generationState,
-                        onGenerateLearningScreens = onGenerateLearningScreens,
-                        onLearnGame = onLearnGame,
-                        onChatRulebook = onChatRulebook
-                    )
-                }
             }
 
             else -> {
@@ -787,86 +751,6 @@ private fun ProcessingProgressRow(label: String, progress: Float? = null) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    }
-}
-
-// ─── Strumenti AI ────────────────────────────────────────────────────────────
-
-@Composable
-private fun AiToolsSection(
-    hasLearningScreens: Boolean,
-    generationState: LearningScreensGenerationState,
-    onGenerateLearningScreens: () -> Unit,
-    onLearnGame: () -> Unit,
-    onChatRulebook: () -> Unit
-) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(
-            text = "Strumenti AI",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-
-        // ─ Schermate di apprendimento ────────────────────────────────────
-        when {
-            hasLearningScreens -> {
-                FilledTonalButton(
-                    onClick = onLearnGame,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("📖  Schermate di apprendimento", style = MaterialTheme.typography.labelMedium)
-                }
-            }
-            generationState is LearningScreensGenerationState.Generating -> {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp,
-                        color = AccentOrange
-                    )
-                    Text(
-                        "Generazione schermate…",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-            }
-            generationState is LearningScreensGenerationState.Error -> {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        "Errore generazione",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error
-                    )
-                    TextButton(onClick = onGenerateLearningScreens) {
-                        Text("Riprova", style = MaterialTheme.typography.labelSmall)
-                    }
-                }
-            }
-            else -> {
-                OutlinedButton(
-                    onClick = onGenerateLearningScreens,
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("✨  Genera schermate di apprendimento", style = MaterialTheme.typography.labelMedium)
-                }
-            }
-        }
-
-        // ─ Chatbot ───────────────────────────────────────────────────────
-        OutlinedButton(
-            onClick = onChatRulebook,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("💬  Chatbot regolamento", style = MaterialTheme.typography.labelMedium)
-        }
     }
 }
 
