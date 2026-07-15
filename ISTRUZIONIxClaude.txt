@@ -1,0 +1,175 @@
+# KumaKeep — Project Context
+
+## Identità sviluppatore
+- **Handle:** KumaDev (kumadev-IT su GitHub)
+- **Background:** sviluppatore Java/Spring Boot + Kotlin/Android, esperto di board game (450 giochi in collezione)
+- **Lingua:** comunicazione in italiano, codice in inglese
+
+---
+
+## App: KumaKeep
+**Package:** `com.kumadev.kumakeep`  
+**Descrizione:** Gestore personale di collezione board game per Android — alternativa leggera e mobile-first a BoardGameGeek, per uso personale single-user.
+
+### Filosofia prodotto
+- La collezione e le liste dell'utente sono **entità completamente separate da BGG** — BGG è solo fonte dati per ricerca e dettagli
+- App **offline-first**: i dati vivono in Room, BGG è solo consultato on-demand
+- **Single-user**: nessun concetto di userId ovunque
+- UI minimalista per esperti: no informazioni ridondanti, info essenziali a colpo d'occhio
+
+---
+
+## Tech Stack
+- **Language:** Kotlin
+- **UI:** Jetpack Compose + Material3
+- **Architecture:** MVVM + Clean Architecture
+- **DI:** Hilt
+- **Database:** Room
+- **Networking:** Retrofit + SimpleXML (BGG XML API v2)
+- **Image loading:** Coil
+- **Navigation:** Navigation Compose
+- **Build:** AGP 8.10.1, Kotlin 2.1.20, KSP 2.1.20-1.0.32, minSdk 26, targetSdk 36
+
+---
+
+## Package Structure
+```
+com.kumadev.kumakeep/
+├── data/
+│   ├── local/
+│   │   ├── dao/              # BoardGameDao, LibraryDao, WishlistDao
+│   │   ├── entity/           # BoardGameEntity, LibraryEntity, WishlistEntity, WishlistEntryEntity
+│   │   ├── converter/        # Converters.kt (TypeConverter per enum)
+│   │   └── KumaKeepDatabase.kt
+│   ├── remote/
+│   │   ├── api/              # BggApiService (Retrofit)
+│   │   ├── dto/              # BggThingResponse, BggSearchResponse (SimpleXML)
+│   │   └── mapper/           # BggMapper.kt (DTO → Entity)
+│   └── repository/           # BoardGameRepositoryImpl
+├── domain/
+│   ├── model/                # BoardGame, LibraryEntry, SearchResult
+│   ├── repository/           # BoardGameRepository (interfaccia)
+│   └── usecase/              # GetLibraryUseCase, SearchBggUseCase, GetGameDetailUseCase,
+│                             # AddToLibraryUseCase, RemoveFromLibraryUseCase
+├── presentation/
+│   ├── navigation/           # Screen.kt, KumaKeepNavGraph.kt
+│   ├── theme/                # Color.kt, Type.kt, Theme.kt
+│   ├── components/           # (componenti riutilizzabili futuri)
+│   ├── library/              # LibraryScreen.kt, LibraryViewModel.kt
+│   ├── search/               # SearchScreen.kt, SearchViewModel.kt
+│   ├── gamedetail/           # GameDetailScreen.kt, GameDetailViewModel.kt
+│   └── wishlist/             # (da implementare)
+├── di/                       # DatabaseModule, NetworkModule, RepositoryModule
+└── KumaKeepApp.kt            # @HiltAndroidApp
+```
+
+---
+
+## Database Schema (Room)
+
+### `BoardGameEntity` — cache dati BGG
+Campi: `id`, `bggId` (unique), `primaryName`, `alias`, `yearPublished`, `minPlayers`, `maxPlayers`, `minAge`, `playingTime`, `complexity` (float 1-5), `bggRating` (float), `thumbnail`, `image`, `description`, `designers`, `artists`, `publishers`, `categories`, `mechanics`, `families` (tutti CSV string), `createdAt`, `updatedAt`
+
+### `LibraryEntity` — collezione utente
+Campi: `id`, `bggId` (FK → BoardGameEntity, CASCADE), `rate` (enum UserRate), `numPlays` (enum NumPlays), `notes`, `createdAt`, `updatedAt`
+
+### `WishlistEntity` — liste wishlist (named)
+Campi: `id`, `name` (unique), `description`, `createdAt`
+
+### `WishlistEntryEntity` — giochi nelle wishlist
+Campi: `id`, `wishlistId` (FK → WishlistEntity, CASCADE), `bggId` (FK → BoardGameEntity, CASCADE), `toBuy` (Boolean flag), `notes`, `createdAt`
+
+### Enum
+```kotlin
+enum class UserRate { BAH, MID, YES, TOP, WOW, NOT_RATED }
+enum class NumPlays { ZERO, ONE, MANY, PLENTY, NOT_CLASSIFIED }
+```
+
+---
+
+## BGG API
+- **Base URL:** `https://boardgamegeek.com/xmlapi2/`
+- **Auth:** Bearer token in header `Authorization`
+- **Token:** gestito via `local.properties` → `BuildConfig.BGG_TOKEN`
+- **Headers:** `Authorization: Bearer <token>`, `User-Agent: KumaKeep/1.0 (Android; kumadev.code@gmail.com)`, `Accept: application/xml`
+- **Endpoints usati:**
+  - `GET /search?query=<q>&type=boardgame` → `BggSearchResponse`
+  - `GET /thing?id=<id>&type=boardgame&stats=1` → `BggThingResponse`
+- **Nota:** tutte le liste nei DTO usano `MutableList` con `mutableListOf()` (non `emptyList()`) per compatibilità SimpleXML
+
+---
+
+## Palette colori (dal logo — orso con scudo)
+```kotlin
+BackgroundDeep  = #1C2D3A  // sfondo principale
+SurfaceDark     = #2A3F52  // surface/card
+SurfaceVariant  = #1F3040  // variante surface
+AccentOrange    = #C4511A  // accent primario (muso/scudo logo)
+AccentGreen     = #2A7A5A  // accent secondario (libro/occhio logo)
+TextPrimary     = #F0EDE8  // testo principale
+TextSecondary   = #B0BEC5  // testo secondario
+TextDisabled    = #607080  // testo disabilitato
+```
+Tema: **dark di default**, `darkColorScheme` Material3.
+
+---
+
+## Navigazione
+- **Bottom bar:** Libreria / Cerca / Wishlist
+- **Routes:** `Screen.Library`, `Screen.Search`, `Screen.GameDetail("game_detail/{bggId}")`, `Screen.Wishlist`
+- **Back stack:** Game Detail nasconde la bottom bar, ha TopAppBar con back button
+
+---
+
+## Linee guida sviluppo
+1. **Clean Architecture strict:** domain non importa nulla da data/presentation
+2. **Single-user:** mai usare userId
+3. **Flow reattivo:** le query Room restituiscono `Flow<T>`, le scritture sono `suspend fun`
+4. **KSP** (non kapt) per Room e Hilt
+5. **Coroutines** sempre su `viewModelScope`, mai operazioni su main thread
+6. **UiState sealed interface** per ogni schermata (Loading/Success/Error/Empty)
+7. **UseCase** con `operator fun invoke` per chiamata diretta
+8. **OnConflictStrategy.REPLACE** per BoardGameDao (cache BGG), **ABORT** per LibraryDao/WishlistDao
+9. **DTO SimpleXML:** tutte le liste devono essere `MutableList` con `mutableListOf()`
+10. **Enum TypeConverter:** salvati come String (`.name`), deserializzati con `firstOrNull ?: default`
+11. **Token BGG:** mai hardcodato, sempre da `BuildConfig.BGG_TOKEN` → `local.properties`
+
+---
+
+## Stato implementazione attuale (v0.9 — MVP funzionante)
+
+### ✅ Completato
+- Stack Gradle completo (AGP 8.10.1 + Kotlin 2.1.20 + KSP + Hilt)
+- Room database con tutte le entity e DAO
+- BGG API integration (Retrofit + SimpleXML + Bearer auth)
+- Clean Architecture completa
+- Search Screen (debounce 600ms, risultati live da BGG)
+- Library Screen (lista collezione, rimozione giochi)
+- Game Detail Screen (cover, stats, info, toggle libreria)
+- Bottom Navigation (Library/Search/Wishlist)
+- Tema dark Material3 con palette logo
+- Icona app + Splash screen (adaptive icon)
+- `local.properties` per BGG token (sicuro, non committato)
+
+### 🔴 Backlog per v1.0.0 (in ordine di priorità)
+1. **Wishlist Screen** — lista delle wishlist named + giochi dentro, flag `toBuy`
+2. **Auto Backup** — `res/xml/backup_rules.xml` + `AndroidManifest` config
+3. **Room exportSchema** — aggiungere path export in `app/build.gradle.kts`
+4. **Error handling** — Snackbar globale per feedback operazioni (aggiunta/rimozione)
+5. **Privacy Policy + GDPR** — pagina in-app + link esterno (obbligatorio Play Store)
+6. **Play Store preparation** — keystore signing, release build, store listing, screenshot
+
+### 🟡 Backlog futuro (post 1.0.0)
+- Tag system per sub-collection (es. "party", "evergreen", "topPlaying")
+- Grafico voto personale nel Game Detail
+- Export manuale database
+- UX polish (animazioni, empty states migliorati, feedback visivo)
+- Migrazione dati da Postgres esistente (script seed Room al primo avvio)
+
+---
+
+## File chiave da condividere per continuare
+Quando riprendi lo sviluppo, condividi i file modificati di recente o quelli su cui stai lavorando. I file più frequentemente toccati sono:
+- `app/build.gradle.kts` e `gradle/libs.versions.toml`
+- File in `data/`, `domain/`, `presentation/`
+- `AndroidManifest.xml`

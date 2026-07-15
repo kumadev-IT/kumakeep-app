@@ -15,6 +15,8 @@ data class RulebookChunkEntity(
     /** Numero di pagina del primo token del chunk */
     val pageNum: Int,
     val text: String,
+    /** Tipo di sezione logica (SETUP, GAMEPLAY, PLAYER_TURN, ...). Null se non classificato. */
+    val sectionType: String?,
     /** FloatArray serializzato in little-endian (4 byte per float). Null se embedding non disponibile. */
     val embeddingBlob: ByteArray?,
     val rulesReaderVersion: String
@@ -28,6 +30,7 @@ data class RulebookChunkEntity(
             chunkIndex == other.chunkIndex &&
             pageNum == other.pageNum &&
             text == other.text &&
+            sectionType == other.sectionType &&
             embeddingBlob.contentEquals(other.embeddingBlob) &&
             rulesReaderVersion == other.rulesReaderVersion
     }
@@ -38,6 +41,7 @@ data class RulebookChunkEntity(
         result = 31 * result + chunkIndex
         result = 31 * result + pageNum
         result = 31 * result + text.hashCode()
+        result = 31 * result + (sectionType?.hashCode() ?: 0)
         result = 31 * result + (embeddingBlob?.contentHashCode() ?: 0)
         result = 31 * result + rulesReaderVersion.hashCode()
         return result
