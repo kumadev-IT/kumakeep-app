@@ -1,0 +1,18 @@
+# Normalizza tutti i file di testo a LF nel repository (checkout resta CRLF su Windows se core.autocrlf=true)
+* text=auto eol=lf
+
+# File binari: mai toccare i line endings
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.ico binary
+*.jks binary
+*.keystore binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.jar binary
+*.zip binary
+*.pdf binary
