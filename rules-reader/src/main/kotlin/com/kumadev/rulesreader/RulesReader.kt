@@ -139,6 +139,10 @@ class RulesReader @Inject constructor(
                         chunkIndex = chunk.index,
                         pageNum = chunk.pageNum,
                         text = chunk.text,
+                        // Structure-Aware Chunker (Fase 1) non ancora ricablato in questo branch:
+                        // il chunker corrente non classifica le sezioni → sectionType resta null
+                        // finché non si reintegra la logica del SectionDetector (cfr. RulesChunker in f027cfe).
+                        sectionType = null,
                         embeddingBlob = blob,
                         rulesReaderVersion = BuildConfig.RULES_READER_VERSION
                     )
