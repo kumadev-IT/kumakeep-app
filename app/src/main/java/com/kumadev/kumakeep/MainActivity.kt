@@ -7,6 +7,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.kumadev.kumakeep.util.PendingPdfHolder
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CollectionsBookmark
@@ -26,16 +27,23 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.kumadev.kumakeep.presentation.SnackbarController
 import com.kumadev.kumakeep.presentation.navigation.KumaKeepNavGraph
 import com.kumadev.kumakeep.presentation.navigation.Screen
 import com.kumadev.kumakeep.presentation.theme.AccentOrange
+import com.kumadev.kumakeep.presentation.theme.DevBannerRed
 import com.kumadev.kumakeep.presentation.theme.KumaKeepTheme
 import com.kumadev.kumakeep.presentation.theme.SurfaceDark
 import com.kumadev.kumakeep.presentation.theme.TextSecondary
@@ -80,6 +88,11 @@ class MainActivity : ComponentActivity() {
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.background,
+                    topBar = {
+                        if (BuildConfig.IS_DEV_BUILD) {
+                            DevModeBanner()
+                        }
+                    },
                     snackbarHost = {
                         SnackbarHost(snackbarHostState) { data ->
                             Snackbar(
@@ -184,5 +197,28 @@ class MainActivity : ComponentActivity() {
             PendingPdfHolder.uri = uri
             PendingPdfHolder.fileName = fileName
         }
+    }
+}
+
+/**
+ * Striscia sempre visibile, su tutte le schermate, solo nella build "dev".
+ * Serve al tester per non confondere mai questa build con quella "reale" (debug).
+ */
+@Composable
+private fun DevModeBanner() {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = DevBannerRed
+    ) {
+        Text(
+            text = "DEV MODE  •  v${BuildConfig.VERSION_NAME}",
+            color = Color.White,
+            fontWeight = FontWeight.Bold,
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp)
+        )
     }
 }

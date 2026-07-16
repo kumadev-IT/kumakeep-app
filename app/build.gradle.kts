@@ -36,6 +36,7 @@ android {
             "GEMINI_API_KEY",
             "\"${localProperties.getProperty("GEMINI_API_KEY", "")}\""
         )
+        buildConfigField("Boolean", "IS_DEV_BUILD", "false")
     }
 
     buildTypes {
@@ -46,9 +47,22 @@ android {
                 "proguard-rules.pro"
             )
         }
+        // Build "reale": qui vivono i dati dell'utente (install corrente da Android Studio).
+        // NON toccare: applicationId/DB path deve restare invariato.
         debug {
             isDebuggable = true
             applicationIdSuffix = ".debug"
+        }
+        // Build "dev": per testare feature nuove senza toccare i dati reali.
+        // applicationId diverso (.dev) => storage/DB Android completamente separati da .debug.
+        create("dev") {
+            initWith(getByName("debug"))
+            matchingFallbacks += listOf("debug")
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-dev"
+            buildConfigField("Boolean", "IS_DEV_BUILD", "true")
+            resValue("string", "app_name", "KumaKeep DEV")
+            resValue("color", "ic_launcher_background", "#D32F2F")
         }
     }
 

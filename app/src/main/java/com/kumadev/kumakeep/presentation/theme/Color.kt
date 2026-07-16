@@ -19,3 +19,6 @@ val RatingMid = Color(0xFF90A4AE)
 val RatingYes = Color(0xFF2A7A5A)
 val RatingTop = Color(0xFFC4511A)
 val RatingWow = Color(0xFFFFD700)
+
+// Build "dev" — colore ben distinto dalla palette prod (usato per icona app + banner DEV MODE)
+val DevBannerRed = Color(0xFFD32F2F)
