@@ -22,7 +22,4 @@ interface BoardGameDao {
 
     @Query("SELECT * FROM boardgames WHERE bggId IN (:bggIds)")
     fun getByBggIds(bggIds: List<Long>): Flow<List<BoardGameEntity>>
-
-    @Query("SELECT * FROM boardgames WHERE primaryName LIKE '%' || :query || '%'")
-    fun searchLocal(query: String): Flow<List<BoardGameEntity>>
 }

@@ -85,12 +85,6 @@ class BoardGameRepositoryImpl @Inject constructor(
         }
     }
 
-    override fun searchLibrary(query: String): Flow<List<BoardGame>> {
-        return boardGameDao.searchLocal(query).map { entities ->
-            entities.map { it.toDomain(null) }
-        }
-    }
-
     override fun getPlayedCount(): Flow<Int> = libraryDao.getPlayedCount()
 
     override fun getWishlistGameCount(): Flow<Int> = wishlistDao.getWishlistGameCount()
