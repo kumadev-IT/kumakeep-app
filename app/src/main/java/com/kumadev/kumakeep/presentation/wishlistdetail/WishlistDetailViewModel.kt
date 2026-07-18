@@ -4,7 +4,6 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kumadev.kumakeep.data.local.dao.WishlistDao
-import com.kumadev.kumakeep.domain.model.SearchResult
 import com.kumadev.kumakeep.domain.model.WishlistEntry
 import com.kumadev.kumakeep.domain.usecase.AddGameToWishlistUseCase
 import com.kumadev.kumakeep.domain.usecase.DeleteWishlistUseCase
@@ -13,6 +12,7 @@ import com.kumadev.kumakeep.domain.usecase.RemoveFromWishlistUseCase
 import com.kumadev.kumakeep.domain.usecase.RenameWishlistUseCase
 import com.kumadev.kumakeep.domain.usecase.ReorderWishlistUseCase
 import com.kumadev.kumakeep.domain.usecase.SearchBggUseCase
+import com.kumadev.kumakeep.presentation.search.SearchUiState
 import com.kumadev.kumakeep.presentation.SnackbarController
 import com.kumadev.kumakeep.presentation.SnackbarEvent
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,13 +31,6 @@ sealed interface WishlistDetailUiState {
         val entries: List<WishlistEntry>
     ) : WishlistDetailUiState
     data object Deleted : WishlistDetailUiState
-}
-
-sealed interface SearchUiState {
-    data object Idle : SearchUiState
-    data object Loading : SearchUiState
-    data class Results(val items: List<SearchResult>) : SearchUiState
-    data object Empty : SearchUiState
 }
 
 @HiltViewModel
@@ -140,9 +133,9 @@ class WishlistDetailViewModel @Inject constructor(
             searchBggUseCase(query)
                 .onSuccess { results ->
                     _searchState.value = if (results.isEmpty()) SearchUiState.Empty
-                    else SearchUiState.Results(results)
+                    else SearchUiState.Success(results)
                 }
-                .onFailure { _searchState.value = SearchUiState.Idle }
+                .onFailure { _searchState.value = SearchUiState.Error("Errore di rete. Controlla la connessione.") }
         }
     }
 

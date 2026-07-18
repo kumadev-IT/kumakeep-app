@@ -61,6 +61,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.kumadev.kumakeep.domain.model.SearchResult
 import com.kumadev.kumakeep.domain.model.WishlistEntry
+import com.kumadev.kumakeep.presentation.search.SearchUiState
 import sh.calvin.reorderable.ReorderableItem
 import sh.calvin.reorderable.rememberReorderableLazyListState
 
@@ -394,9 +395,16 @@ private fun SearchAddGameSheet(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            is SearchUiState.Results -> {
+            is SearchUiState.Error -> {
+                Text(
+                    searchState.message,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            is SearchUiState.Success -> {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    items(searchState.items, key = { it.bggId }) { result ->
+                    items(searchState.results, key = { it.bggId }) { result ->
                         SearchResultRow(result = result, onAdd = { onGameAdd(result.bggId, result.name) })
                     }
                 }

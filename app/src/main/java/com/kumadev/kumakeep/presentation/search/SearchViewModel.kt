@@ -19,13 +19,6 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-sealed interface SearchUiState {
-    data object Idle : SearchUiState
-    data object Loading : SearchUiState
-    data class Success(val results: List<SearchResult>) : SearchUiState
-    data class Error(val message: String) : SearchUiState
-}
-
 @OptIn(FlowPreview::class)
 @HiltViewModel
 class SearchViewModel @Inject constructor(
@@ -61,7 +54,10 @@ class SearchViewModel @Inject constructor(
         viewModelScope.launch {
             _uiState.value = SearchUiState.Loading
             searchBggUseCase(query)
-                .onSuccess { _uiState.value = SearchUiState.Success(it) }
+                .onSuccess {
+                    _uiState.value = if (it.isEmpty()) SearchUiState.Empty
+                    else SearchUiState.Success(it)
+                }
                 .onFailure { _uiState.value = SearchUiState.Error("Errore di rete. Controlla la connessione.") }
         }
     }

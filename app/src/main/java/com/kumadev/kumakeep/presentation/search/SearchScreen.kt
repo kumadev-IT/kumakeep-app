@@ -113,6 +113,16 @@ fun SearchScreen(
                     }
                 }
 
+                is SearchUiState.Empty -> {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Text(
+                            "Nessun risultato",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
                 is SearchUiState.Success -> {
                     LazyColumn {
                         items(state.results, key = { it.bggId }) { result ->
