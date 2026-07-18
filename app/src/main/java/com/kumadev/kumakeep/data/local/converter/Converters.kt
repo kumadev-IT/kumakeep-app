@@ -1,8 +1,8 @@
 package com.kumadev.kumakeep.data.local.converter
 
 import androidx.room.TypeConverter
-import com.kumadev.kumakeep.data.local.entity.NumPlays
-import com.kumadev.kumakeep.data.local.entity.UserRate
+import com.kumadev.kumakeep.domain.model.NumPlays
+import com.kumadev.kumakeep.domain.model.UserRate
 
 class Converters {
 

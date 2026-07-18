@@ -79,7 +79,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.LibraryEntry
+import com.kumadev.kumakeep.domain.model.NumPlays
 import com.kumadev.kumakeep.domain.model.Rulebook
+import com.kumadev.kumakeep.domain.model.UserRate
 import com.kumadev.kumakeep.domain.model.WishlistWithStatus
 import com.kumadev.kumakeep.presentation.theme.AccentGreen
 import com.kumadev.kumakeep.presentation.theme.AccentOrange
@@ -215,7 +217,7 @@ fun GameDetailScreen(
     val currentState = uiState
     if (showRatingSheet && currentState is GameDetailUiState.Success) {
         RatingSheet(
-            currentRate = currentState.game.libraryEntry?.rate ?: "NOT_RATED",
+            currentRate = currentState.game.libraryEntry?.rate ?: UserRate.NOT_RATED,
             onSelect = viewModel::updateRate,
             onDismiss = viewModel::dismissRatingSheet
         )
@@ -223,7 +225,7 @@ fun GameDetailScreen(
 
     if (showNumPlaysSheet && currentState is GameDetailUiState.Success) {
         NumPlaysSheet(
-            currentNumPlays = currentState.game.libraryEntry?.numPlays ?: "NOT_CLASSIFIED",
+            currentNumPlays = currentState.game.libraryEntry?.numPlays ?: NumPlays.NOT_CLASSIFIED,
             onSelect = viewModel::updateNumPlays,
             onDismiss = viewModel::dismissNumPlaysSheet
         )
@@ -836,11 +838,17 @@ private fun UserBadgesSection(entry: LibraryEntry) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun RatingSheet(
-    currentRate: String,
-    onSelect: (String) -> Unit,
+    currentRate: UserRate,
+    onSelect: (UserRate) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val options = listOf("BAH" to "Meh", "MID" to "Ok", "YES" to "Sì!", "TOP" to "Top", "WOW" to "Wow")
+    val options = listOf(
+        UserRate.BAH to "Meh",
+        UserRate.MID to "Ok",
+        UserRate.YES to "Sì!",
+        UserRate.TOP to "Top",
+        UserRate.WOW to "Wow"
+    )
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -857,7 +865,7 @@ private fun RatingSheet(
                     val selected = currentRate == value
                     FilterChip(
                         selected = selected,
-                        onClick = { onSelect(if (selected) "NOT_RATED" else value) },
+                        onClick = { onSelect(if (selected) UserRate.NOT_RATED else value) },
                         label = { Text(label) }
                     )
                 }
@@ -872,11 +880,16 @@ private fun RatingSheet(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NumPlaysSheet(
-    currentNumPlays: String,
-    onSelect: (String) -> Unit,
+    currentNumPlays: NumPlays,
+    onSelect: (NumPlays) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val options = listOf("ZERO" to "0", "ONE" to "1", "MANY" to "Alcune", "PLENTY" to "Tante")
+    val options = listOf(
+        NumPlays.ZERO to "0",
+        NumPlays.ONE to "1",
+        NumPlays.MANY to "Alcune",
+        NumPlays.PLENTY to "Tante"
+    )
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
@@ -893,7 +906,7 @@ private fun NumPlaysSheet(
                     val selected = currentNumPlays == value
                     FilterChip(
                         selected = selected,
-                        onClick = { onSelect(if (selected) "NOT_CLASSIFIED" else value) },
+                        onClick = { onSelect(if (selected) NumPlays.NOT_CLASSIFIED else value) },
                         label = { Text(label) }
                     )
                 }
@@ -1016,21 +1029,21 @@ private fun WishlistSelectionSheet(
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-private fun String.toRateLabel(): String? = when (this) {
-    "BAH" -> "Meh"
-    "MID" -> "Ok"
-    "YES" -> "Sì!"
-    "TOP" -> "Top"
-    "WOW" -> "Wow"
-    else -> null
+private fun UserRate.toRateLabel(): String? = when (this) {
+    UserRate.BAH -> "Meh"
+    UserRate.MID -> "Ok"
+    UserRate.YES -> "Sì!"
+    UserRate.TOP -> "Top"
+    UserRate.WOW -> "Wow"
+    UserRate.NOT_RATED -> null
 }
 
-private fun String.toNumPlaysLabel(): String? = when (this) {
-    "ZERO" -> "0 partite"
-    "ONE" -> "1 partita"
-    "MANY" -> "Alcune"
-    "PLENTY" -> "Tante"
-    else -> null
+private fun NumPlays.toNumPlaysLabel(): String? = when (this) {
+    NumPlays.ZERO -> "0 partite"
+    NumPlays.ONE -> "1 partita"
+    NumPlays.MANY -> "Alcune"
+    NumPlays.PLENTY -> "Tante"
+    NumPlays.NOT_CLASSIFIED -> null
 }
 
 private fun Long.toReadableSize(): String {

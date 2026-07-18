@@ -9,8 +9,8 @@ import androidx.room.Transaction
 import androidx.room.Update
 import com.kumadev.kumakeep.data.local.entity.BoardGameEntity
 import com.kumadev.kumakeep.data.local.entity.LibraryEntity
-import com.kumadev.kumakeep.data.local.entity.UserRate
-import com.kumadev.kumakeep.data.local.entity.NumPlays
+import com.kumadev.kumakeep.domain.model.UserRate
+import com.kumadev.kumakeep.domain.model.NumPlays
 import kotlinx.coroutines.flow.Flow
 
 @Dao

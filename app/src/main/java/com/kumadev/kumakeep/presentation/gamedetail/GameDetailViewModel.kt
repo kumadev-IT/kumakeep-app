@@ -7,8 +7,8 @@ import androidx.lifecycle.viewModelScope
 import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.Rulebook
 import com.kumadev.kumakeep.domain.model.WishlistWithStatus
-import com.kumadev.kumakeep.data.local.entity.NumPlays
-import com.kumadev.kumakeep.data.local.entity.UserRate
+import com.kumadev.kumakeep.domain.model.NumPlays
+import com.kumadev.kumakeep.domain.model.UserRate
 import com.kumadev.kumakeep.domain.usecase.AddToLibraryUseCase
 import com.kumadev.kumakeep.domain.usecase.AddToWishlistsUseCase
 import com.kumadev.kumakeep.domain.usecase.DeleteRulebookUseCase
@@ -225,19 +225,19 @@ class GameDetailViewModel @Inject constructor(
     fun openNumPlaysSheet() { _showNumPlaysSheet.value = true }
     fun dismissNumPlaysSheet() { _showNumPlaysSheet.value = false }
 
-    fun updateRate(rateName: String) {
+    fun updateRate(rate: UserRate) {
         viewModelScope.launch {
             _showRatingSheet.value = false
-            updateLibraryEntryUseCase(bggId, rate = UserRate.valueOf(rateName))
+            updateLibraryEntryUseCase(bggId, rate = rate)
                 .onSuccess { loadGame() }
                 .onFailure { snackbarController.sendEvent(SnackbarEvent("Errore aggiornamento valutazione")) }
         }
     }
 
-    fun updateNumPlays(numPlaysName: String) {
+    fun updateNumPlays(numPlays: NumPlays) {
         viewModelScope.launch {
             _showNumPlaysSheet.value = false
-            updateLibraryEntryUseCase(bggId, numPlays = NumPlays.valueOf(numPlaysName))
+            updateLibraryEntryUseCase(bggId, numPlays = numPlays)
                 .onSuccess { loadGame() }
                 .onFailure { snackbarController.sendEvent(SnackbarEvent("Errore aggiornamento partite")) }
         }

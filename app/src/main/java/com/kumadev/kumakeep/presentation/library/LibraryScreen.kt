@@ -45,6 +45,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.kumadev.kumakeep.domain.model.BoardGame
+import com.kumadev.kumakeep.domain.model.UserRate
 import com.kumadev.kumakeep.presentation.theme.AccentGreen
 import com.kumadev.kumakeep.presentation.theme.SurfaceVariant
 
@@ -210,9 +211,9 @@ private fun LibraryGameCard(
                     )
                 }
                 game.libraryEntry?.let { entry ->
-                    if (entry.rate != "NOT_RATED") {
+                    if (entry.rate != UserRate.NOT_RATED) {
                         Text(
-                            text = entry.rate,
+                            text = entry.rate.name,
                             style = MaterialTheme.typography.labelSmall,
                             color = AccentGreen
                         )

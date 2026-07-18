@@ -4,6 +4,8 @@ import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.kumadev.kumakeep.domain.model.NumPlays
+import com.kumadev.kumakeep.domain.model.UserRate
 
 @Entity(
     tableName = "library",
@@ -25,11 +27,3 @@ data class LibraryEntity(
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
-
-enum class UserRate {
-    BAH, MID, YES, TOP, WOW, NOT_RATED
-}
-
-enum class NumPlays {
-    ZERO, ONE, MANY, PLENTY, NOT_CLASSIFIED
-}

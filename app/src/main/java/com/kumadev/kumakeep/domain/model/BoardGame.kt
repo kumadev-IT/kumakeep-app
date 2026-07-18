@@ -23,11 +23,19 @@ data class BoardGame(
 
 data class LibraryEntry(
     val id: Long,
-    val rate: String,
-    val numPlays: String,
+    val rate: UserRate,
+    val numPlays: NumPlays,
     val notes: String?,
     val createdAt: Long = 0L
 )
+
+enum class UserRate {
+    BAH, MID, YES, TOP, WOW, NOT_RATED
+}
+
+enum class NumPlays {
+    ZERO, ONE, MANY, PLENTY, NOT_CLASSIFIED
+}
 
 // risultato leggero per la lista di ricerca BGG (no dettagli)
 data class SearchResult(

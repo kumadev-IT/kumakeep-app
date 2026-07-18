@@ -105,8 +105,8 @@ private fun BoardGameEntity.toDomain(
         libraryEntry = libraryEntity?.let {
             LibraryEntry(
                 id = it.id,
-                rate = it.rate.name,
-                numPlays = it.numPlays.name,
+                rate = it.rate,
+                numPlays = it.numPlays,
                 notes = it.notes,
                 createdAt = it.createdAt
             )

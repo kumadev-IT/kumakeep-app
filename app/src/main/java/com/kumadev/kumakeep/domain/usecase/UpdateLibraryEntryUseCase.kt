@@ -1,8 +1,8 @@
 package com.kumadev.kumakeep.domain.usecase
 
 import com.kumadev.kumakeep.data.local.dao.LibraryDao
-import com.kumadev.kumakeep.data.local.entity.NumPlays
-import com.kumadev.kumakeep.data.local.entity.UserRate
+import com.kumadev.kumakeep.domain.model.NumPlays
+import com.kumadev.kumakeep.domain.model.UserRate
 import javax.inject.Inject
 
 class UpdateLibraryEntryUseCase @Inject constructor(
