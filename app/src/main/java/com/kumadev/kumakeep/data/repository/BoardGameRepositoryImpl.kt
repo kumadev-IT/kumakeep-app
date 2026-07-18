@@ -36,20 +36,43 @@ class BoardGameRepositoryImpl @Inject constructor(
 
     override suspend fun getGameDetail(bggId: Long): Result<BoardGame> {
         return runCatching {
-            // prima controlla la cache locale
             val cached = boardGameDao.getByBggId(bggId)
-            if (cached != null) {
-                val libraryEntry = libraryDao.getByBggId(bggId)
+            val libraryEntry = libraryDao.getByBggId(bggId)
+
+            // cache presente e ancora valida (TTL adattivo) → usa la copia locale
+            if (cached != null && !cached.isCacheStale()) {
                 return Result.success(cached.toDomain(libraryEntry))
             }
-            // altrimenti chiama BGG e salva in cache
-            val response = bggApiService.getGameDetail(bggId)
-            val item = response.items.firstOrNull()
-                ?: error("Gioco non trovato su BGG")
-            val entity = item.toEntity()
-            boardGameDao.insertOrReplace(entity)
-            val libraryEntry = libraryDao.getByBggId(bggId)
-            entity.toDomain(libraryEntry)
+
+            // cache assente o scaduta → prova a rinfrescare da BGG
+            try {
+                val response = bggApiService.getGameDetail(bggId)
+                val item = response.items.firstOrNull()
+                    ?: error("Gioco non trovato su BGG")
+                val fresh = item.toEntity()
+
+                if (cached != null) {
+                    // Update in-place: preserva id/createdAt e NON esegue il DELETE+INSERT
+                    // di insertOrReplace (REPLACE), che con la FK onDelete=CASCADE
+                    // cancellerebbe a cascata la library entry / le wishlist entry collegate.
+                    val refreshed = fresh.copy(
+                        id = cached.id,
+                        createdAt = cached.createdAt,
+                        updatedAt = System.currentTimeMillis()
+                    )
+                    boardGameDao.update(refreshed)
+                    refreshed.toDomain(libraryEntry)
+                } else {
+                    boardGameDao.insertOrReplace(fresh)
+                    fresh.toDomain(libraryEntry)
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // Rete assente / errore: se abbiamo una copia (anche stantia) la mostriamo,
+                // altrimenti propaghiamo l'errore.
+                cached?.toDomain(libraryEntry) ?: throw e
+            }
         }
     }
 
@@ -78,6 +101,28 @@ class BoardGameRepositoryImpl @Inject constructor(
             val entityMap = entities.associateBy { it.bggId }
             bggIds.mapNotNull { id -> entityMap[id]?.toDomain(null) }
         }
+    }
+}
+
+// ─── TTL adattivo per la cache dei dettagli ───────────────────────────────────
+// La freschezza richiesta dipende dalla volatilità del dato: un gioco in uscita o
+// appena pubblicato cambia spesso (rating in formazione, descrizione, player count),
+// uno vecchio è di fatto congelato. Il costo API è trascurabile (refresh lazy, solo
+// all'apertura del dettaglio), quindi il TTL ottimizza la freschezza, non le chiamate.
+private const val DAY_MS = 24L * 60 * 60 * 1000
+
+private fun BoardGameEntity.isCacheStale(now: Long = System.currentTimeMillis()): Boolean =
+    now - updatedAt > cacheTtlMillis()
+
+private fun BoardGameEntity.cacheTtlMillis(): Long {
+    val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+    return when {
+        // in uscita o pubblicato quest'anno (anno mancante = prudenziale)
+        yearPublished == null || yearPublished >= currentYear -> 1 * DAY_MS
+        // uscito negli ultimi ~2 anni
+        yearPublished >= currentYear - 2 -> 7 * DAY_MS
+        // gioco consolidato
+        else -> 90 * DAY_MS
     }
 }
 
