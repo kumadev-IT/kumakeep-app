@@ -121,6 +121,9 @@ class BoardGameRepositoryImpl @Inject constructor(
     override fun getExpansionBaseLinks(expansionBggId: Long): Flow<List<Long>> =
         ownedExpansionDao.getBaseIdsForExpansion(expansionBggId)
 
+    override fun getOwnedExpansionCount(): Flow<Int> =
+        ownedExpansionDao.getOwnedExpansionCount()
+
     override suspend fun addOwnedExpansion(expansionBggId: Long, baseBggId: Long): Result<Unit> {
         return runCatching {
             // entrambi i giochi devono esistere in `boardgames` (FK). Di norma lo

@@ -36,4 +36,8 @@ interface OwnedExpansionDao {
     /** Id dei giochi base a cui questa espansione è collegata (0 = non posseduta). */
     @Query("SELECT baseBggId FROM owned_expansions WHERE expansionBggId = :expansionBggId")
     fun getBaseIdsForExpansion(expansionBggId: Long): Flow<List<Long>>
+
+    /** Numero di espansioni distinte possedute (una collegata a più basi conta 1). */
+    @Query("SELECT COUNT(DISTINCT expansionBggId) FROM owned_expansions")
+    fun getOwnedExpansionCount(): Flow<Int>
 }

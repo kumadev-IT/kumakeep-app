@@ -144,6 +144,7 @@ fun HomeScreen(
                     StatCard(label = "Games", value = uiState.libraryCount, modifier = Modifier.weight(1f))
                     StatCard(label = "Wishlist", value = uiState.wishlistCount, modifier = Modifier.weight(1f))
                     StatCard(label = "Played", value = uiState.playedCount, modifier = Modifier.weight(1f))
+                    StatCard(label = "Expansions", value = uiState.expansionCount, modifier = Modifier.weight(1f))
                 }
 
                 Spacer(Modifier.height(24.dp))
@@ -199,7 +200,9 @@ private fun StatCard(label: String, value: Int, modifier: Modifier = Modifier) {
             Text(
                 text = label.uppercase(),
                 style = MaterialTheme.typography.labelSmall,
-                color = TextSecondary
+                color = TextSecondary,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = value.toString(),

@@ -17,6 +17,8 @@ interface BoardGameRepository {
     fun getOwnedExpansions(baseBggId: Long): Flow<List<BoardGame>>
     /** Id dei giochi base a cui un'espansione è collegata (vuoto = non posseduta). */
     fun getExpansionBaseLinks(expansionBggId: Long): Flow<List<Long>>
+    /** Numero totale di espansioni distinte possedute (per la Home). */
+    fun getOwnedExpansionCount(): Flow<Int>
     /** Collega un'espansione posseduta a un gioco base. */
     suspend fun addOwnedExpansion(expansionBggId: Long, baseBggId: Long): Result<Unit>
     /** Rimuove un'espansione posseduta da tutti i suoi giochi base. */

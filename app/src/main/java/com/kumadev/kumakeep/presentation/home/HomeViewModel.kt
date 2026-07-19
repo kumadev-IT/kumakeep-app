@@ -23,6 +23,7 @@ data class HomeUiState(
     val libraryCount: Int = 0,
     val wishlistCount: Int = 0,
     val playedCount: Int = 0,
+    val expansionCount: Int = 0,
     val recentlyAdded: List<BoardGame> = emptyList(),
     val recentlyViewed: List<BoardGame> = emptyList()
 )
@@ -31,6 +32,7 @@ private data class LibrarySnapshot(
     val games: List<BoardGame>,
     val playedCount: Int,
     val wishlistCount: Int,
+    val expansionCount: Int,
     val carouselSize: Int
 )
 
@@ -65,6 +67,7 @@ class HomeViewModel @Inject constructor(
                 getLibraryUseCase(),
                 repository.getPlayedCount(),
                 repository.getWishlistGameCount(),
+                repository.getOwnedExpansionCount(),
                 userPreferences.carouselSizeFlow
             ) { args ->
                 @Suppress("UNCHECKED_CAST")
@@ -72,7 +75,8 @@ class HomeViewModel @Inject constructor(
                     games = args[0] as List<BoardGame>,
                     playedCount = args[1] as Int,
                     wishlistCount = args[2] as Int,
-                    carouselSize = args[3] as Int
+                    expansionCount = args[3] as Int,
+                    carouselSize = args[4] as Int
                 )
             }.collect { snap ->
                 _uiState.update {
@@ -80,6 +84,7 @@ class HomeViewModel @Inject constructor(
                         libraryCount = snap.games.size,
                         playedCount = snap.playedCount,
                         wishlistCount = snap.wishlistCount,
+                        expansionCount = snap.expansionCount,
                         recentlyAdded = snap.games
                             .sortedByDescending { g -> g.libraryEntry?.createdAt ?: 0L }
                             .take(snap.carouselSize)
