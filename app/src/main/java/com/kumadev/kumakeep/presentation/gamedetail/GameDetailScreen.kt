@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -556,11 +557,6 @@ private fun GameDetailContent(
                 UserBadgesSection(entry)
             }
 
-            // Espansioni possedute (solo per i giochi base)
-            if (!game.isExpansion && ownedExpansions.isNotEmpty()) {
-                OwnedExpansionsSection(expansions = ownedExpansions, onOpenGame = onOpenGame)
-            }
-
             // Sezione Regolamento
             Spacer(Modifier.height(16.dp))
             HorizontalDivider(color = SurfaceVariant)
@@ -605,6 +601,11 @@ private fun GameDetailContent(
                         color = MaterialTheme.colorScheme.primary
                     )
                 }
+            }
+
+            // Espansioni possedute — carosello sotto la descrizione (solo per i base)
+            if (!game.isExpansion && ownedExpansions.isNotEmpty()) {
+                OwnedExpansionsSection(expansions = ownedExpansions, onOpenGame = onOpenGame)
             }
 
             // Link a BoardGameGeek
@@ -990,40 +991,38 @@ private fun OwnedExpansionsSection(
             color = MaterialTheme.colorScheme.onSurface
         )
     }
-    Spacer(Modifier.height(8.dp))
+    Spacer(Modifier.height(10.dp))
 
-    expansions.forEach { exp ->
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onOpenGame(exp.bggId) }
-                .padding(vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            AsyncImage(
-                model = exp.thumbnail,
-                contentDescription = exp.primaryName,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(6.dp))
-            )
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = exp.primaryName,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                Icons.Default.OpenInNew,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(16.dp)
-            )
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        items(expansions, key = { it.bggId }) { exp ->
+            ExpansionCard(expansion = exp, onClick = { onOpenGame(exp.bggId) })
         }
+    }
+}
+
+@Composable
+private fun ExpansionCard(expansion: BoardGame, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .width(84.dp)
+            .clickable(onClick = onClick)
+    ) {
+        AsyncImage(
+            model = expansion.thumbnail,
+            contentDescription = expansion.primaryName,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(84.dp)
+                .clip(RoundedCornerShape(8.dp))
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = expansion.primaryName,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

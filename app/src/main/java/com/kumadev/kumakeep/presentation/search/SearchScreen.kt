@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,16 +19,20 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -36,7 +41,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.kumadev.kumakeep.domain.model.BaseGameRef
 import com.kumadev.kumakeep.domain.model.SearchResult
+import com.kumadev.kumakeep.presentation.theme.AccentOrange
 import com.kumadev.kumakeep.presentation.theme.SurfaceVariant
 
 @Composable
@@ -46,6 +53,7 @@ fun SearchScreen(
 ) {
     val query by viewModel.query.collectAsStateWithLifecycle()
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
+    val expansionChooser by viewModel.expansionChooser.collectAsStateWithLifecycle()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -143,11 +151,66 @@ fun SearchScreen(
                             SearchResultItem(
                                 result = result,
                                 onGameClick = { onGameClick(result.bggId) },
-                                onAddToLibrary = { viewModel.addToLibrary(result.bggId, result.name) }
+                                onAdd = { viewModel.onAddResult(result) }
                             )
                             HorizontalDivider(color = MaterialTheme.colorScheme.surfaceVariant)
                         }
                     }
+                }
+            }
+        }
+    }
+
+    // Scelta del gioco base quando l'espansione ne estende più d'uno posseduto
+    expansionChooser?.let { chooser ->
+        ExpansionBaseChooserSheet(
+            chooser = chooser,
+            onSelect = viewModel::confirmExpansionBase,
+            onDismiss = viewModel::dismissExpansionChooser
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ExpansionBaseChooserSheet(
+    chooser: ExpansionChooser,
+    onSelect: (BaseGameRef) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            Text(
+                "\"${chooser.expansionName}\" — aggiungi come espansione di",
+                style = MaterialTheme.typography.titleMedium
+            )
+            Spacer(Modifier.height(12.dp))
+            chooser.candidates.forEach { base ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelect(base) }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Extension,
+                        contentDescription = null,
+                        tint = AccentOrange,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = base.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -158,7 +221,7 @@ fun SearchScreen(
 private fun SearchResultItem(
     result: SearchResult,
     onGameClick: () -> Unit,
-    onAddToLibrary: () -> Unit
+    onAdd: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -199,10 +262,13 @@ private fun SearchResultItem(
             }
         }
         Spacer(modifier = Modifier.width(8.dp))
-        IconButton(onClick = onAddToLibrary) {
+        // Stesso "+" per giochi ed espansioni: aggiunge. Cosa aggiunge (libreria
+        // o collegamento come espansione) è deciso nel ViewModel.
+        IconButton(onClick = onAdd) {
             Icon(
                 Icons.Default.Add,
-                contentDescription = "Aggiungi alla libreria",
+                contentDescription = if (result.isExpansion) "Aggiungi come espansione"
+                else "Aggiungi alla libreria",
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(20.dp)
             )
