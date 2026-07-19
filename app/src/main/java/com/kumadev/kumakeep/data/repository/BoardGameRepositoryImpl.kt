@@ -36,11 +36,18 @@ class BoardGameRepositoryImpl @Inject constructor(
             val seen = LinkedHashMap<Long, SearchResult>()
             for (item in items) {
                 if (!seen.containsKey(item.id)) {
+                    val isExpansion = item.id in expansionIds
+                    val isOwned = if (isExpansion) {
+                        ownedExpansionDao.isOwned(item.id)
+                    } else {
+                        libraryDao.getByBggId(item.id) != null
+                    }
                     seen[item.id] = SearchResult(
                         bggId = item.id,
                         name = item.name?.value ?: "",
                         yearPublished = item.yearPublished?.value,
-                        isExpansion = item.id in expansionIds
+                        isExpansion = isExpansion,
+                        isOwned = isOwned
                     )
                 }
             }

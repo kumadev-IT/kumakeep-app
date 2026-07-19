@@ -54,5 +54,7 @@ data class SearchResult(
     val name: String,
     val yearPublished: Int?,
     // true se BGG classifica questo id come espansione (tag EXP in lista)
-    val isExpansion: Boolean = false
+    val isExpansion: Boolean = false,
+    // true se già posseduto: in libreria (giochi base) o collegato a una base (espansioni)
+    val isOwned: Boolean = false
 )

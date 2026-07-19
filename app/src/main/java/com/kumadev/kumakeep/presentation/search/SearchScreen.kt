@@ -43,6 +43,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kumadev.kumakeep.domain.model.BaseGameRef
 import com.kumadev.kumakeep.domain.model.SearchResult
+import com.kumadev.kumakeep.presentation.theme.AccentGreen
 import com.kumadev.kumakeep.presentation.theme.AccentOrange
 import com.kumadev.kumakeep.presentation.theme.SurfaceVariant
 
@@ -252,6 +253,17 @@ private fun SearchResultItem(
                             .padding(horizontal = 5.dp, vertical = 1.dp)
                     )
                 }
+                if (result.isOwned) {
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        text = "OWNED",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color.White,
+                        modifier = Modifier
+                            .background(AccentGreen, RoundedCornerShape(4.dp))
+                            .padding(horizontal = 5.dp, vertical = 1.dp)
+                    )
+                }
             }
             result.yearPublished?.let {
                 Text(
@@ -263,15 +275,18 @@ private fun SearchResultItem(
         }
         Spacer(modifier = Modifier.width(8.dp))
         // Stesso "+" per giochi ed espansioni: aggiunge. Cosa aggiunge (libreria
-        // o collegamento come espansione) è deciso nel ViewModel.
-        IconButton(onClick = onAdd) {
-            Icon(
-                Icons.Default.Add,
-                contentDescription = if (result.isExpansion) "Aggiungi come espansione"
-                else "Aggiungi alla libreria",
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(20.dp)
-            )
+        // o collegamento come espansione) è deciso nel ViewModel. Nascosto se già
+        // posseduto: non si può aggiungere due volte lo stesso gioco.
+        if (!result.isOwned) {
+            IconButton(onClick = onAdd) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = if (result.isExpansion) "Aggiungi come espansione"
+                    else "Aggiungi alla libreria",
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
         }
     }
 }

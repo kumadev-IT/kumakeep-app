@@ -40,4 +40,8 @@ interface OwnedExpansionDao {
     /** Numero di espansioni distinte possedute (una collegata a più basi conta 1). */
     @Query("SELECT COUNT(DISTINCT expansionBggId) FROM owned_expansions")
     fun getOwnedExpansionCount(): Flow<Int>
+
+    /** True se l'espansione è collegata ad almeno un gioco base (posseduta). */
+    @Query("SELECT EXISTS(SELECT 1 FROM owned_expansions WHERE expansionBggId = :expansionBggId)")
+    suspend fun isOwned(expansionBggId: Long): Boolean
 }
