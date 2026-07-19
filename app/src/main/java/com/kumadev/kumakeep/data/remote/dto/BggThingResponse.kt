@@ -16,6 +16,11 @@ data class BggItemDto(
     @field:Attribute(name = "id", required = false)
     var id: Long = 0,
 
+    // "boardgame" | "boardgameexpansion" | "boardgameaccessory".
+    // Sul `thing` (a differenza del `search`) è univoco e autorevole.
+    @field:Attribute(name = "type", required = false)
+    var type: String = "",
+
     @field:ElementList(inline = true, required = false, entry = "name")
     var names: MutableList<BggNameDto> = mutableListOf(),
 
@@ -57,6 +62,14 @@ data class BggItemDto(
     fun mechanics() = links.filter { it.type == "boardgamemechanic" }.map { it.value }
     fun families() = links.filter { it.type == "boardgamefamily" }.map { it.value }
     fun primaryName() = names.firstOrNull { it.type == "primary" }?.value ?: ""
+
+    fun isExpansion() = type == "boardgameexpansion"
+
+    // Giochi base che questa espansione estende: link boardgameexpansion con
+    // inbound="true" (id + nome). Vuoto per i giochi base.
+    fun baseGames(): List<Pair<Long, String>> =
+        links.filter { it.type == "boardgameexpansion" && it.inbound == "true" }
+            .map { it.id to it.value }
 }
 
 @Root(name = "name", strict = false)
@@ -70,11 +83,19 @@ data class BggNameDto(
 
 @Root(name = "link", strict = false)
 data class BggLinkDto(
+    @field:Attribute(name = "id", required = false)
+    var id: Long = 0,
+
     @field:Attribute(name = "type", required = false)
     var type: String = "",
 
     @field:Attribute(name = "value", required = false)
-    var value: String = ""
+    var value: String = "",
+
+    // presente (="true") solo sui link che puntano "all'indietro" verso il
+    // gioco base, es. su un'espansione i suoi giochi base.
+    @field:Attribute(name = "inbound", required = false)
+    var inbound: String? = null
 )
 
 @Root(name = "statistics", strict = false)

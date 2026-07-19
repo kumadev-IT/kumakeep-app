@@ -60,6 +60,9 @@ fun KumaKeepNavGraph(navController: NavHostController) {
                 },
                 onInspectRulebook = { gameId ->
                     navController.navigate(Screen.RulesInspector.createRoute(gameId))
+                },
+                onOpenGame = { targetId ->
+                    navController.navigate(Screen.GameDetail.createRoute(targetId))
                 }
             )
         }

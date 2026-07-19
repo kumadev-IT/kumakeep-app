@@ -141,6 +141,8 @@ private fun BoardGameEntity.toDomain(
         publishers = publishers?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
         categories = categories?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
         mechanics = mechanics?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
+        isExpansion = isExpansion,
+        baseGames = com.kumadev.kumakeep.data.remote.mapper.parseBaseGames(baseGamesRef),
         libraryEntry = libraryEntity?.let {
             LibraryEntry(
                 id = it.id,

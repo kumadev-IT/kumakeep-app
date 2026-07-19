@@ -24,7 +24,7 @@ import com.kumadev.kumakeep.data.local.entity.WishlistEntryEntity
         WishlistEntryEntity::class,
         RulebookEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -60,6 +60,17 @@ abstract class KumaKeepDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "CREATE UNIQUE INDEX IF NOT EXISTS index_rulebooks_gameId ON rulebooks (gameId)"
+                )
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE boardgames ADD COLUMN isExpansion INTEGER NOT NULL DEFAULT 0"
+                )
+                db.execSQL(
+                    "ALTER TABLE boardgames ADD COLUMN baseGamesRef TEXT"
                 )
             }
         }

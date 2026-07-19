@@ -13,10 +13,11 @@ interface BggApiService {
         @Query("type") type: String = "boardgame"
     ): BggSearchResponse
 
+    // NB: nessun filtro `type`. L'endpoint `thing` risolve per id; passare
+    // type=boardgame escluderebbe le espansioni (items vuoto → "gioco non trovato").
     @GET("thing")
     suspend fun getGameDetail(
         @Query("id") id: Long,
-        @Query("type") type: String = "boardgame",
         @Query("stats") stats: Int = 1
     ): BggThingResponse
 }

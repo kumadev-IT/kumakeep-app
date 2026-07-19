@@ -26,7 +26,11 @@ object DatabaseModule {
             KumaKeepDatabase::class.java,
             "kumakeep.db"
         )
-            .addMigrations(KumaKeepDatabase.MIGRATION_1_2, KumaKeepDatabase.MIGRATION_2_3)
+            .addMigrations(
+                KumaKeepDatabase.MIGRATION_1_2,
+                KumaKeepDatabase.MIGRATION_2_3,
+                KumaKeepDatabase.MIGRATION_3_4
+            )
             .build()
     }
 

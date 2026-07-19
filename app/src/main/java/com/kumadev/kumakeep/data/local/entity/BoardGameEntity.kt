@@ -30,6 +30,12 @@ data class BoardGameEntity(
     val categories: String? = null,
     val mechanics: String? = null,
     val families: String? = null,
+    // classificazione BGG (dato esterno, sovrascritto al refresh)
+    val isExpansion: Boolean = false,
+    // giochi base collegati (per un'espansione), serializzati con separatori di
+    // controllo (RS tra record, US tra id e nome). Null per i giochi base.
+    // Serializzazione/parsing centralizzati in BggMapper.kt.
+    val baseGamesRef: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )

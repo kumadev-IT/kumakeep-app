@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Label
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Replay
@@ -77,6 +78,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
+import com.kumadev.kumakeep.domain.model.BaseGameRef
 import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.LibraryEntry
 import com.kumadev.kumakeep.domain.model.NumPlays
@@ -96,6 +98,7 @@ fun GameDetailScreen(
     onBack: () -> Unit,
     onOpenRulebook: (gameId: Long) -> Unit,
     onInspectRulebook: (gameId: Long) -> Unit,
+    onOpenGame: (bggId: Long) -> Unit,
     viewModel: GameDetailViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
@@ -200,6 +203,7 @@ fun GameDetailScreen(
                     onStartProcessingClick = viewModel::startRulebookProcessing,
                     onResetProcessingClick = viewModel::resetRulebookProcessing,
                     onDeleteRulebookClick = viewModel::openDeleteRulebookDialog,
+                    onOpenGame = onOpenGame,
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -375,6 +379,7 @@ private fun GameDetailContent(
     onStartProcessingClick: () -> Unit,
     onResetProcessingClick: () -> Unit,
     onDeleteRulebookClick: () -> Unit,
+    onOpenGame: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -428,6 +433,12 @@ private fun GameDetailContent(
         }
 
         Column(modifier = Modifier.padding(16.dp)) {
+
+            // Banner "Espansione di": mostrato solo per le espansioni
+            if (game.isExpansion && game.baseGames.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+                ExpansionForSection(baseGames = game.baseGames, onOpenGame = onOpenGame)
+            }
 
             Spacer(Modifier.height(16.dp))
 
@@ -830,6 +841,59 @@ private fun UserBadgesSection(entry: LibraryEntry) {
                 border = null
             )
         }
+    }
+}
+
+// ─── Banner "Espansione di" ───────────────────────────────────────────────────
+
+@Composable
+private fun ExpansionForSection(
+    baseGames: List<BaseGameRef>,
+    onOpenGame: (Long) -> Unit
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                Icons.Default.Link,
+                contentDescription = null,
+                tint = AccentGreen,
+                modifier = Modifier.size(16.dp)
+            )
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = "ESPANSIONE DI",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = AccentGreen
+            )
+        }
+        Spacer(Modifier.height(8.dp))
+        baseGames.forEach { base ->
+            AssistChip(
+                onClick = { onOpenGame(base.bggId) },
+                label = {
+                    Text(
+                        base.name,
+                        style = MaterialTheme.typography.labelMedium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.OpenInNew,
+                        contentDescription = null,
+                        tint = AccentOrange,
+                        modifier = Modifier.size(14.dp)
+                    )
+                },
+                colors = AssistChipDefaults.assistChipColors(containerColor = SurfaceVariant),
+                border = null,
+                modifier = Modifier.padding(vertical = 2.dp)
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        HorizontalDivider(color = SurfaceVariant)
     }
 }
 

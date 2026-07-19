@@ -17,8 +17,19 @@ data class BoardGame(
     val publishers: List<String>,
     val categories: List<String>,
     val mechanics: List<String>,
+    // classificazione BGG: true se è un'espansione (non compare in collection,
+    // vive solo nel dettaglio del gioco base)
+    val isExpansion: Boolean = false,
+    // giochi base che questa espansione estende (vuoto per i giochi base)
+    val baseGames: List<BaseGameRef> = emptyList(),
     // stato utente — null se il gioco non è in collezione
     val libraryEntry: LibraryEntry? = null
+)
+
+// riferimento leggero a un gioco base collegato a un'espansione
+data class BaseGameRef(
+    val bggId: Long,
+    val name: String
 )
 
 data class LibraryEntry(
