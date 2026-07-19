@@ -7,6 +7,8 @@ import android.text.Html
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -30,6 +32,7 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.CheckBox
 import androidx.compose.material.icons.filled.CheckBoxOutlineBlank
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.Link
@@ -68,6 +71,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -111,6 +115,9 @@ fun GameDetailScreen(
     val pendingImport by viewModel.pendingImport.collectAsStateWithLifecycle()
     val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
     val processingState by viewModel.rulebookProcessingState.collectAsStateWithLifecycle()
+    val ownedExpansions by viewModel.ownedExpansions.collectAsStateWithLifecycle()
+    val expansionBaseLinks by viewModel.expansionBaseLinks.collectAsStateWithLifecycle()
+    val baseChooser by viewModel.baseChooser.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
 
@@ -155,18 +162,28 @@ fun GameDetailScreen(
         bottomBar = {
             val state = uiState
             if (state is GameDetailUiState.Success) {
-                GameDetailBottomBar(
-                    game = state.game,
-                    rulebook = rulebook,
-                    onLibraryClick = viewModel::toggleLibrary,
-                    onWishlistClick = viewModel::openWishlistDialog,
-                    onRatingClick = viewModel::openRatingSheet,
-                    onNumPlaysClick = viewModel::openNumPlaysSheet,
-                    onRulebookClick = {
-                        if (rulebook != null) onOpenRulebook(bggId)
-                        else pdfPickerLauncher.launch("application/pdf")
-                    }
-                )
+                val onRulebookClick: () -> Unit = {
+                    if (rulebook != null) onOpenRulebook(bggId)
+                    else pdfPickerLauncher.launch("application/pdf")
+                }
+                if (state.game.isExpansion) {
+                    ExpansionBottomBar(
+                        owned = expansionBaseLinks.isNotEmpty(),
+                        rulebook = rulebook,
+                        onToggleOwned = viewModel::toggleOwnedExpansion,
+                        onRulebookClick = onRulebookClick
+                    )
+                } else {
+                    GameDetailBottomBar(
+                        game = state.game,
+                        rulebook = rulebook,
+                        onLibraryClick = viewModel::toggleLibrary,
+                        onWishlistClick = viewModel::openWishlistDialog,
+                        onRatingClick = viewModel::openRatingSheet,
+                        onNumPlaysClick = viewModel::openNumPlaysSheet,
+                        onRulebookClick = onRulebookClick
+                    )
+                }
             }
         }
     ) { padding ->
@@ -204,6 +221,7 @@ fun GameDetailScreen(
                     onResetProcessingClick = viewModel::resetRulebookProcessing,
                     onDeleteRulebookClick = viewModel::openDeleteRulebookDialog,
                     onOpenGame = onOpenGame,
+                    ownedExpansions = ownedExpansions,
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -273,6 +291,15 @@ fun GameDetailScreen(
             }
         )
     }
+
+    // Scelta del gioco base quando l'espansione ne estende più d'uno posseduto
+    baseChooser?.let { candidates ->
+        BaseChooserSheet(
+            candidates = candidates,
+            onSelect = viewModel::confirmBaseChoice,
+            onDismiss = viewModel::dismissBaseChooser
+        )
+    }
 }
 
 // ─── Bottom action bar ────────────────────────────────────────────────────────
@@ -340,6 +367,41 @@ private fun GameDetailBottomBar(
 }
 
 @Composable
+private fun ExpansionBottomBar(
+    owned: Boolean,
+    rulebook: Rulebook?,
+    onToggleOwned: () -> Unit,
+    onRulebookClick: () -> Unit
+) {
+    BottomAppBar(
+        containerColor = SurfaceDark,
+        tonalElevation = 0.dp,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+        windowInsets = WindowInsets(0),
+        modifier = Modifier.height(60.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            BottomBarItem(
+                icon = if (owned) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                label = if (owned) "Posseduta" else "Possiedo",
+                tint = if (owned) AccentOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = onToggleOwned
+            )
+            BottomBarItem(
+                icon = Icons.Default.MenuBook,
+                label = "Regole",
+                tint = if (rulebook != null) AccentOrange else MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = onRulebookClick
+            )
+        }
+    }
+}
+
+@Composable
 private fun BottomBarItem(
     icon: ImageVector,
     label: String,
@@ -380,6 +442,7 @@ private fun GameDetailContent(
     onResetProcessingClick: () -> Unit,
     onDeleteRulebookClick: () -> Unit,
     onOpenGame: (Long) -> Unit,
+    ownedExpansions: List<BoardGame>,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -491,6 +554,11 @@ private fun GameDetailContent(
             // Badge utente (rating + numPlays): visibili solo se impostati
             game.libraryEntry?.let { entry ->
                 UserBadgesSection(entry)
+            }
+
+            // Espansioni possedute (solo per i giochi base)
+            if (!game.isExpansion && ownedExpansions.isNotEmpty()) {
+                OwnedExpansionsSection(expansions = ownedExpansions, onOpenGame = onOpenGame)
             }
 
             // Sezione Regolamento
@@ -894,6 +962,113 @@ private fun ExpansionForSection(
         }
         Spacer(Modifier.height(12.dp))
         HorizontalDivider(color = SurfaceVariant)
+    }
+}
+
+// ─── Sezione "Espansioni possedute" (nel dettaglio del gioco base) ────────────
+
+@Composable
+private fun OwnedExpansionsSection(
+    expansions: List<BoardGame>,
+    onOpenGame: (Long) -> Unit
+) {
+    Spacer(Modifier.height(16.dp))
+    HorizontalDivider(color = SurfaceVariant)
+    Spacer(Modifier.height(12.dp))
+
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            Icons.Default.Extension,
+            contentDescription = null,
+            tint = AccentOrange,
+            modifier = Modifier.size(16.dp)
+        )
+        Spacer(Modifier.width(6.dp))
+        Text(
+            text = "Espansioni (${expansions.size})",
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+    Spacer(Modifier.height(8.dp))
+
+    expansions.forEach { exp ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOpenGame(exp.bggId) }
+                .padding(vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = exp.thumbnail,
+                contentDescription = exp.primaryName,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(6.dp))
+            )
+            Spacer(Modifier.width(12.dp))
+            Text(
+                text = exp.primaryName,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+            Icon(
+                Icons.Default.OpenInNew,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+    }
+}
+
+// ─── Sheet scelta gioco base (espansione con più basi possedute) ──────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BaseChooserSheet(
+    candidates: List<BaseGameRef>,
+    onSelect: (BaseGameRef) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 32.dp)
+        ) {
+            Text("Aggiungi come espansione di", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(12.dp))
+            candidates.forEach { base ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelect(base) }
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Extension,
+                        contentDescription = null,
+                        tint = AccentOrange,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = base.name,
+                        style = MaterialTheme.typography.bodyLarge,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
     }
 }
 

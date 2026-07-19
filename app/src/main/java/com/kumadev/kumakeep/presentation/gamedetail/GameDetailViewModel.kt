@@ -4,19 +4,25 @@ import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.kumadev.kumakeep.domain.model.BaseGameRef
 import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.Rulebook
 import com.kumadev.kumakeep.domain.model.WishlistWithStatus
 import com.kumadev.kumakeep.domain.model.NumPlays
 import com.kumadev.kumakeep.domain.model.UserRate
+import com.kumadev.kumakeep.domain.usecase.AddOwnedExpansionUseCase
 import com.kumadev.kumakeep.domain.usecase.AddToLibraryUseCase
 import com.kumadev.kumakeep.domain.usecase.AddToWishlistsUseCase
 import com.kumadev.kumakeep.domain.usecase.DeleteRulebookUseCase
+import com.kumadev.kumakeep.domain.usecase.GetExpansionBaseLinksUseCase
 import com.kumadev.kumakeep.domain.usecase.GetGameDetailUseCase
+import com.kumadev.kumakeep.domain.usecase.GetOwnedBaseCandidatesUseCase
+import com.kumadev.kumakeep.domain.usecase.GetOwnedExpansionsUseCase
 import com.kumadev.kumakeep.domain.usecase.GetRulebookUseCase
 import com.kumadev.kumakeep.domain.usecase.GetWishlistsForGameUseCase
 import com.kumadev.kumakeep.domain.usecase.ImportRulebookUseCase
 import com.kumadev.kumakeep.domain.usecase.RemoveFromLibraryUseCase
+import com.kumadev.kumakeep.domain.usecase.RemoveOwnedExpansionUseCase
 import com.kumadev.kumakeep.domain.usecase.UpdateLibraryEntryUseCase
 import com.kumadev.kumakeep.data.local.preferences.UserPreferences
 import com.kumadev.kumakeep.presentation.SnackbarController
@@ -49,6 +55,11 @@ class GameDetailViewModel @Inject constructor(
     private val updateLibraryEntryUseCase: UpdateLibraryEntryUseCase,
     private val getWishlistsForGameUseCase: GetWishlistsForGameUseCase,
     private val addToWishlistsUseCase: AddToWishlistsUseCase,
+    private val getOwnedExpansionsUseCase: GetOwnedExpansionsUseCase,
+    private val getExpansionBaseLinksUseCase: GetExpansionBaseLinksUseCase,
+    private val addOwnedExpansionUseCase: AddOwnedExpansionUseCase,
+    private val removeOwnedExpansionUseCase: RemoveOwnedExpansionUseCase,
+    private val getOwnedBaseCandidatesUseCase: GetOwnedBaseCandidatesUseCase,
     private val getRulebookUseCase: GetRulebookUseCase,
     private val importRulebookUseCase: ImportRulebookUseCase,
     private val deleteRulebookUseCase: DeleteRulebookUseCase,
@@ -71,6 +82,26 @@ class GameDetailViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = emptyList()
         )
+
+    /** Espansioni possedute collegate a questo gioco (rilevante se è un base). */
+    val ownedExpansions: StateFlow<List<BoardGame>> =
+        getOwnedExpansionsUseCase(bggId).stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
+
+    /** Giochi base a cui questa espansione è collegata (vuoto = non posseduta). */
+    val expansionBaseLinks: StateFlow<List<Long>> =
+        getExpansionBaseLinksUseCase(bggId).stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
+
+    /** Basi possedute tra cui scegliere quando un'espansione ne estende più d'una. */
+    private val _baseChooser = MutableStateFlow<List<BaseGameRef>?>(null)
+    val baseChooser: StateFlow<List<BaseGameRef>?> = _baseChooser.asStateFlow()
 
     val rulebook: StateFlow<Rulebook?> =
         getRulebookUseCase(bggId).stateIn(
@@ -156,6 +187,66 @@ class GameDetailViewModel @Inject constructor(
                     }
             }
         }
+    }
+
+    // ─── Espansione posseduta ────────────────────────────────────────────────────
+
+    /**
+     * Toggle "possiedo questa espansione". Se già posseduta la scollega da tutte
+     * le basi; altrimenti la aggancia a una base posseduta (scelta se >1, avviso
+     * se nessuna base è in libreria).
+     */
+    fun toggleOwnedExpansion() {
+        val state = _uiState.value as? GameDetailUiState.Success ?: return
+        val game = state.game
+        if (!game.isExpansion) return
+
+        viewModelScope.launch {
+            if (expansionBaseLinks.value.isNotEmpty()) {
+                removeOwnedExpansionUseCase(bggId)
+                    .onSuccess {
+                        snackbarController.sendEvent(
+                            SnackbarEvent(message = "\"${game.primaryName}\" rimossa dalle espansioni")
+                        )
+                    }
+                    .onFailure { snackbarController.sendEvent(SnackbarEvent("Errore durante la rimozione")) }
+                return@launch
+            }
+
+            val candidates = getOwnedBaseCandidatesUseCase(game.baseGames)
+            when {
+                candidates.isEmpty() -> {
+                    val names = game.baseGames.joinToString(", ") { it.name }
+                    snackbarController.sendEvent(
+                        SnackbarEvent(
+                            message = if (names.isBlank()) "Aggiungi prima il gioco base alla libreria"
+                            else "Aggiungi prima alla libreria: $names"
+                        )
+                    )
+                }
+                candidates.size == 1 -> linkExpansionTo(candidates.first(), game.primaryName)
+                else -> _baseChooser.value = candidates
+            }
+        }
+    }
+
+    /** Conferma la scelta della base nel picker (caso espansione con più basi). */
+    fun confirmBaseChoice(base: BaseGameRef) {
+        val state = _uiState.value as? GameDetailUiState.Success ?: return
+        _baseChooser.value = null
+        viewModelScope.launch { linkExpansionTo(base, state.game.primaryName) }
+    }
+
+    fun dismissBaseChooser() { _baseChooser.value = null }
+
+    private suspend fun linkExpansionTo(base: BaseGameRef, expansionName: String) {
+        addOwnedExpansionUseCase(bggId, base.bggId)
+            .onSuccess {
+                snackbarController.sendEvent(
+                    SnackbarEvent(message = "\"$expansionName\" aggiunta a ${base.name}")
+                )
+            }
+            .onFailure { snackbarController.sendEvent(SnackbarEvent("Errore durante l'aggiunta")) }
     }
 
     // ─── Rulebook ────────────────────────────────────────────────────────────────

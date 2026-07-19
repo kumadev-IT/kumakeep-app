@@ -18,19 +18,33 @@ class BoardGameRepositoryImpl @Inject constructor(
     private val boardGameDao: BoardGameDao,
     private val libraryDao: LibraryDao,
     private val wishlistDao: com.kumadev.kumakeep.data.local.dao.WishlistDao,
+    private val ownedExpansionDao: com.kumadev.kumakeep.data.local.dao.OwnedExpansionDao,
     private val bggApiService: BggApiService
 ) : BoardGameRepository {
 
     override suspend fun searchBgg(query: String): Result<List<SearchResult>> {
         return runCatching {
-            val response = bggApiService.search(query)
-            response.items.map { item ->
-                SearchResult(
-                    bggId = item.id,
-                    name = item.name?.value ?: "",
-                    yearPublished = item.yearPublished?.value
-                )
+            val items = bggApiService.search(query).items
+            // Un id è espansione se compare almeno una volta nel bucket
+            // "boardgameexpansion" (membership affidabile, a differenza del type
+            // della singola riga). Gli accessori non sono gestiti per ora.
+            val expansionIds = items
+                .filter { it.type == "boardgameexpansion" }
+                .map { it.id }
+                .toSet()
+            // Dedup per id preservando l'ordine di prima comparsa.
+            val seen = LinkedHashMap<Long, SearchResult>()
+            for (item in items) {
+                if (!seen.containsKey(item.id)) {
+                    seen[item.id] = SearchResult(
+                        bggId = item.id,
+                        name = item.name?.value ?: "",
+                        yearPublished = item.yearPublished?.value,
+                        isExpansion = item.id in expansionIds
+                    )
+                }
             }
+            seen.values.toList()
         }
     }
 
@@ -94,6 +108,47 @@ class BoardGameRepositoryImpl @Inject constructor(
         return boardGameDao.getByBggIds(bggIds).map { entities ->
             val entityMap = entities.associateBy { it.bggId }
             bggIds.mapNotNull { id -> entityMap[id]?.toDomain(null) }
+        }
+    }
+
+    // ─── Espansioni possedute ─────────────────────────────────────────────────
+
+    override fun getOwnedExpansions(baseBggId: Long): Flow<List<BoardGame>> =
+        ownedExpansionDao.getExpansionsForBase(baseBggId).map { list ->
+            list.map { it.toDomain(null) }
+        }
+
+    override fun getExpansionBaseLinks(expansionBggId: Long): Flow<List<Long>> =
+        ownedExpansionDao.getBaseIdsForExpansion(expansionBggId)
+
+    override suspend fun addOwnedExpansion(expansionBggId: Long, baseBggId: Long): Result<Unit> {
+        return runCatching {
+            // entrambi i giochi devono esistere in `boardgames` (FK). Di norma lo
+            // sono già (espansione = dettaglio aperto, base = in libreria), ma per
+            // sicurezza li rifornisco da BGG se mancanti.
+            ensureCached(expansionBggId)
+            ensureCached(baseBggId)
+            ownedExpansionDao.insert(
+                com.kumadev.kumakeep.data.local.entity.OwnedExpansionEntity(
+                    expansionBggId = expansionBggId,
+                    baseBggId = baseBggId
+                )
+            )
+        }
+    }
+
+    override suspend fun removeOwnedExpansion(expansionBggId: Long): Result<Unit> =
+        runCatching { ownedExpansionDao.unlinkAll(expansionBggId) }
+
+    override suspend fun isInLibrary(bggId: Long): Boolean =
+        libraryDao.getByBggId(bggId) != null
+
+    /** Garantisce che il gioco sia in cache locale (scarica da BGG se assente). */
+    private suspend fun ensureCached(bggId: Long) {
+        if (boardGameDao.getByBggId(bggId) == null) {
+            val response = bggApiService.getGameDetail(bggId)
+            val item = response.items.firstOrNull() ?: error("Gioco non trovato su BGG")
+            boardGameDao.insertOrReplace(item.toEntity())
         }
     }
 }

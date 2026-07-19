@@ -8,10 +8,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
 import com.kumadev.kumakeep.data.local.converter.Converters
 import com.kumadev.kumakeep.data.local.dao.BoardGameDao
 import com.kumadev.kumakeep.data.local.dao.LibraryDao
+import com.kumadev.kumakeep.data.local.dao.OwnedExpansionDao
 import com.kumadev.kumakeep.data.local.dao.RulebookDao
 import com.kumadev.kumakeep.data.local.dao.WishlistDao
 import com.kumadev.kumakeep.data.local.entity.BoardGameEntity
 import com.kumadev.kumakeep.data.local.entity.LibraryEntity
+import com.kumadev.kumakeep.data.local.entity.OwnedExpansionEntity
 import com.kumadev.kumakeep.data.local.entity.RulebookEntity
 import com.kumadev.kumakeep.data.local.entity.WishlistEntity
 import com.kumadev.kumakeep.data.local.entity.WishlistEntryEntity
@@ -22,9 +24,10 @@ import com.kumadev.kumakeep.data.local.entity.WishlistEntryEntity
         LibraryEntity::class,
         WishlistEntity::class,
         WishlistEntryEntity::class,
-        RulebookEntity::class
+        RulebookEntity::class,
+        OwnedExpansionEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -33,6 +36,7 @@ abstract class KumaKeepDatabase : RoomDatabase() {
     abstract fun libraryDao(): LibraryDao
     abstract fun wishlistDao(): WishlistDao
     abstract fun rulebookDao(): RulebookDao
+    abstract fun ownedExpansionDao(): OwnedExpansionDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -71,6 +75,32 @@ abstract class KumaKeepDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "ALTER TABLE boardgames ADD COLUMN baseGamesRef TEXT"
+                )
+            }
+        }
+
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS owned_expansions (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        expansionBggId INTEGER NOT NULL,
+                        baseBggId INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        FOREIGN KEY(expansionBggId) REFERENCES boardgames(bggId) ON DELETE CASCADE,
+                        FOREIGN KEY(baseBggId) REFERENCES boardgames(bggId) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_owned_expansions_expansionBggId_baseBggId ON owned_expansions (expansionBggId, baseBggId)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_owned_expansions_baseBggId ON owned_expansions (baseBggId)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_owned_expansions_expansionBggId ON owned_expansions (expansionBggId)"
                 )
             }
         }

@@ -16,6 +16,12 @@ data class BggSearchItemDto(
     @field:Attribute(name = "id", required = false)
     var id: Long = 0,
 
+    // "boardgame" | "boardgameexpansion" | "boardgameaccessory".
+    // Nel search NON è affidabile per riga (stesso id compare in più bucket):
+    // si usa solo per l'appartenenza al bucket in fase di dedup.
+    @field:Attribute(name = "type", required = false)
+    var type: String = "",
+
     @field:Element(name = "name", required = false)
     var name: BggNameDto? = null,
 

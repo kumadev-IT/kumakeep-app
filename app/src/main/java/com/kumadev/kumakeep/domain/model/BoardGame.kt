@@ -52,5 +52,7 @@ enum class NumPlays {
 data class SearchResult(
     val bggId: Long,
     val name: String,
-    val yearPublished: Int?
+    val yearPublished: Int?,
+    // true se BGG classifica questo id come espansione (tag EXP in lista)
+    val isExpansion: Boolean = false
 )
