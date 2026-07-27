@@ -23,7 +23,15 @@ data class BoardGame(
     // giochi base che questa espansione estende (vuoto per i giochi base)
     val baseGames: List<BaseGameRef> = emptyList(),
     // stato utente — null se il gioco non è in collezione
-    val libraryEntry: LibraryEntry? = null
+    val libraryEntry: LibraryEntry? = null,
+    // tag utente assegnati a questo gioco (dato utente, mai da BGG)
+    val tags: List<Tag> = emptyList()
+)
+
+data class Tag(
+    val id: Long,
+    val name: String,
+    val colorHex: String
 )
 
 // riferimento leggero a un gioco base collegato a un'espansione

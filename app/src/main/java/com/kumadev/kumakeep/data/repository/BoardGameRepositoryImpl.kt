@@ -1,16 +1,24 @@
 package com.kumadev.kumakeep.data.repository
 
 import com.kumadev.kumakeep.data.local.dao.BoardGameDao
+import com.kumadev.kumakeep.data.local.dao.GameTagRow
 import com.kumadev.kumakeep.data.local.dao.LibraryDao
+import com.kumadev.kumakeep.data.local.dao.TagDao
 import com.kumadev.kumakeep.data.local.entity.BoardGameEntity
+import com.kumadev.kumakeep.data.local.entity.GameTagEntity
+import com.kumadev.kumakeep.data.local.entity.TagEntity
 import com.kumadev.kumakeep.data.remote.api.BggApiService
 import com.kumadev.kumakeep.data.remote.mapper.toEntity
 import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.LibraryEntry
 import com.kumadev.kumakeep.domain.model.SearchResult
+import com.kumadev.kumakeep.domain.model.Tag
 import com.kumadev.kumakeep.domain.repository.BoardGameRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
@@ -19,6 +27,7 @@ class BoardGameRepositoryImpl @Inject constructor(
     private val libraryDao: LibraryDao,
     private val wishlistDao: com.kumadev.kumakeep.data.local.dao.WishlistDao,
     private val ownedExpansionDao: com.kumadev.kumakeep.data.local.dao.OwnedExpansionDao,
+    private val tagDao: TagDao,
     private val bggApiService: BggApiService
 ) : BoardGameRepository {
 
@@ -59,10 +68,11 @@ class BoardGameRepositoryImpl @Inject constructor(
         return runCatching {
             val cached = boardGameDao.getByBggId(bggId)
             val libraryEntry = libraryDao.getByBggId(bggId)
+            val tags = tagDao.getTagsForGame(bggId).first().map { it.toDomain() }
 
             // cache presente e ancora valida (TTL adattivo) → usa la copia locale
             if (cached != null && !cached.isCacheStale()) {
-                return Result.success(cached.toDomain(libraryEntry))
+                return Result.success(cached.toDomain(libraryEntry, tags))
             }
 
             // cache assente o scaduta → prova a rinfrescare da BGG
@@ -82,26 +92,32 @@ class BoardGameRepositoryImpl @Inject constructor(
                         updatedAt = System.currentTimeMillis()
                     )
                     boardGameDao.update(refreshed)
-                    refreshed.toDomain(libraryEntry)
+                    refreshed.toDomain(libraryEntry, tags)
                 } else {
                     boardGameDao.insertOrReplace(fresh)
-                    fresh.toDomain(libraryEntry)
+                    fresh.toDomain(libraryEntry, tags)
                 }
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // Rete assente / errore: se abbiamo una copia (anche stantia) la mostriamo,
                 // altrimenti propaghiamo l'errore.
-                cached?.toDomain(libraryEntry) ?: throw e
+                cached?.toDomain(libraryEntry, tags) ?: throw e
             }
         }
     }
 
     override fun getLibraryGames(): Flow<List<BoardGame>> {
-        return libraryDao.getAll().map { libraryEntries ->
-            libraryEntries.mapNotNull { entry ->
-                val game = boardGameDao.getByBggId(entry.bggId) ?: return@mapNotNull null
-                game.toDomain(entry)
+        return libraryDao.getAll().flatMapLatest { libraryEntries ->
+            val bggIds = libraryEntries.map { it.bggId }
+            val tagsFlow = if (bggIds.isEmpty()) flowOf(emptyList()) else tagDao.getTagsForGames(bggIds)
+            tagsFlow.map { tagRows ->
+                val tagsByGame = tagRows.groupBy(GameTagRow::bggId)
+                libraryEntries.mapNotNull { entry ->
+                    val game = boardGameDao.getByBggId(entry.bggId) ?: return@mapNotNull null
+                    val tags = tagsByGame[entry.bggId]?.map { it.toDomain() } ?: emptyList()
+                    game.toDomain(entry, tags)
+                }
             }
         }
     }
@@ -153,6 +169,39 @@ class BoardGameRepositoryImpl @Inject constructor(
     override suspend fun isInLibrary(bggId: Long): Boolean =
         libraryDao.getByBggId(bggId) != null
 
+    // ─── Tag utente ─────────────────────────────────────────────────────────
+
+    override fun getAllTags(): Flow<List<Tag>> =
+        tagDao.getAllTags().map { list -> list.map { it.toDomain() } }
+
+    override fun getTagsForGame(bggId: Long): Flow<List<Tag>> =
+        tagDao.getTagsForGame(bggId).map { list -> list.map { it.toDomain() } }
+
+    override suspend fun createTag(name: String, colorHex: String): Result<Tag> =
+        runCatching {
+            val trimmed = name.trim()
+            require(trimmed.isNotEmpty()) { "Il nome del tag non può essere vuoto" }
+            if (tagDao.existsByName(trimmed)) error("Esiste già un tag chiamato \"$trimmed\"")
+            val id = tagDao.insertTag(TagEntity(name = trimmed, colorHex = colorHex))
+            Tag(id = id, name = trimmed, colorHex = colorHex)
+        }
+
+    override suspend fun updateTag(tagId: Long, name: String, colorHex: String): Result<Unit> =
+        runCatching {
+            val trimmed = name.trim()
+            require(trimmed.isNotEmpty()) { "Il nome del tag non può essere vuoto" }
+            tagDao.updateTag(TagEntity(id = tagId, name = trimmed, colorHex = colorHex))
+        }
+
+    override suspend fun deleteTag(tagId: Long): Result<Unit> =
+        runCatching { tagDao.deleteTag(tagId) }
+
+    override suspend fun assignTagToGame(bggId: Long, tagId: Long): Result<Unit> =
+        runCatching { tagDao.assignTag(GameTagEntity(bggId = bggId, tagId = tagId)) }
+
+    override suspend fun removeTagFromGame(bggId: Long, tagId: Long): Result<Unit> =
+        runCatching { tagDao.removeTag(bggId, tagId) }
+
     /** Garantisce che il gioco sia in cache locale (scarica da BGG se assente). */
     private suspend fun ensureCached(bggId: Long) {
         if (boardGameDao.getByBggId(bggId) == null) {
@@ -185,9 +234,14 @@ private fun BoardGameEntity.cacheTtlMillis(): Long {
     }
 }
 
+private fun TagEntity.toDomain(): Tag = Tag(id = id, name = name, colorHex = colorHex)
+
+private fun GameTagRow.toDomain(): Tag = Tag(id = tagId, name = name, colorHex = colorHex)
+
 // extension per convertire Entity → Domain
 private fun BoardGameEntity.toDomain(
-    libraryEntity: com.kumadev.kumakeep.data.local.entity.LibraryEntity?
+    libraryEntity: com.kumadev.kumakeep.data.local.entity.LibraryEntity?,
+    tags: List<Tag> = emptyList()
 ): BoardGame {
     return BoardGame(
         bggId = bggId,
@@ -216,6 +270,7 @@ private fun BoardGameEntity.toDomain(
                 notes = it.notes,
                 createdAt = it.createdAt
             )
-        }
+        },
+        tags = tags
     )
 }

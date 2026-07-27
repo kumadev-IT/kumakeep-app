@@ -10,11 +10,14 @@ import com.kumadev.kumakeep.data.local.dao.BoardGameDao
 import com.kumadev.kumakeep.data.local.dao.LibraryDao
 import com.kumadev.kumakeep.data.local.dao.OwnedExpansionDao
 import com.kumadev.kumakeep.data.local.dao.RulebookDao
+import com.kumadev.kumakeep.data.local.dao.TagDao
 import com.kumadev.kumakeep.data.local.dao.WishlistDao
 import com.kumadev.kumakeep.data.local.entity.BoardGameEntity
+import com.kumadev.kumakeep.data.local.entity.GameTagEntity
 import com.kumadev.kumakeep.data.local.entity.LibraryEntity
 import com.kumadev.kumakeep.data.local.entity.OwnedExpansionEntity
 import com.kumadev.kumakeep.data.local.entity.RulebookEntity
+import com.kumadev.kumakeep.data.local.entity.TagEntity
 import com.kumadev.kumakeep.data.local.entity.WishlistEntity
 import com.kumadev.kumakeep.data.local.entity.WishlistEntryEntity
 
@@ -25,9 +28,11 @@ import com.kumadev.kumakeep.data.local.entity.WishlistEntryEntity
         WishlistEntity::class,
         WishlistEntryEntity::class,
         RulebookEntity::class,
-        OwnedExpansionEntity::class
+        OwnedExpansionEntity::class,
+        TagEntity::class,
+        GameTagEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -37,6 +42,7 @@ abstract class KumaKeepDatabase : RoomDatabase() {
     abstract fun wishlistDao(): WishlistDao
     abstract fun rulebookDao(): RulebookDao
     abstract fun ownedExpansionDao(): OwnedExpansionDao
+    abstract fun tagDao(): TagDao
 
     companion object {
         val MIGRATION_1_2 = object : Migration(1, 2) {
@@ -101,6 +107,42 @@ abstract class KumaKeepDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_owned_expansions_expansionBggId ON owned_expansions (expansionBggId)"
+                )
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        name TEXT NOT NULL,
+                        colorHex TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_tags_name ON tags (name)"
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS game_tags (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        bggId INTEGER NOT NULL,
+                        tagId INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        FOREIGN KEY(bggId) REFERENCES boardgames(bggId) ON DELETE CASCADE,
+                        FOREIGN KEY(tagId) REFERENCES tags(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_game_tags_bggId_tagId ON game_tags (bggId, tagId)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_game_tags_tagId ON game_tags (tagId)"
                 )
             }
         }

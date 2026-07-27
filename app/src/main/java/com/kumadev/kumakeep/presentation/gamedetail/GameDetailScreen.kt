@@ -57,6 +57,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -88,12 +89,16 @@ import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.LibraryEntry
 import com.kumadev.kumakeep.domain.model.NumPlays
 import com.kumadev.kumakeep.domain.model.Rulebook
+import com.kumadev.kumakeep.domain.model.Tag
 import com.kumadev.kumakeep.domain.model.UserRate
 import com.kumadev.kumakeep.domain.model.WishlistWithStatus
 import com.kumadev.kumakeep.presentation.theme.AccentGreen
 import com.kumadev.kumakeep.presentation.theme.AccentOrange
 import com.kumadev.kumakeep.presentation.theme.SurfaceDark
 import com.kumadev.kumakeep.presentation.theme.SurfaceVariant
+import com.kumadev.kumakeep.presentation.theme.TagColorPalette
+import com.kumadev.kumakeep.presentation.theme.TagColorDefault
+import com.kumadev.kumakeep.presentation.theme.toComposeColor
 import com.kumadev.rulesreader.model.ProcessingState
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -119,6 +124,9 @@ fun GameDetailScreen(
     val ownedExpansions by viewModel.ownedExpansions.collectAsStateWithLifecycle()
     val expansionBaseLinks by viewModel.expansionBaseLinks.collectAsStateWithLifecycle()
     val baseChooser by viewModel.baseChooser.collectAsStateWithLifecycle()
+    val allTags by viewModel.allTags.collectAsStateWithLifecycle()
+    val showTagSheet by viewModel.showTagSheet.collectAsStateWithLifecycle()
+    val showCreateTagDialog by viewModel.showCreateTagDialog.collectAsStateWithLifecycle()
 
     val context = LocalContext.current
 
@@ -223,6 +231,7 @@ fun GameDetailScreen(
                     onDeleteRulebookClick = viewModel::openDeleteRulebookDialog,
                     onOpenGame = onOpenGame,
                     ownedExpansions = ownedExpansions,
+                    onManageTags = viewModel::openTagSheet,
                     modifier = Modifier.padding(padding)
                 )
             }
@@ -299,6 +308,23 @@ fun GameDetailScreen(
             candidates = candidates,
             onSelect = viewModel::confirmBaseChoice,
             onDismiss = viewModel::dismissBaseChooser
+        )
+    }
+
+    if (showTagSheet && currentState is GameDetailUiState.Success) {
+        TagSheet(
+            allTags = allTags,
+            assignedTagIds = currentState.game.tags.map { it.id }.toSet(),
+            onToggleTag = viewModel::toggleGameTag,
+            onCreateNewTag = viewModel::openCreateTagDialog,
+            onDismiss = viewModel::dismissTagSheet
+        )
+    }
+
+    if (showCreateTagDialog) {
+        CreateTagDialog(
+            onCreate = viewModel::createAndAssignTag,
+            onDismiss = viewModel::dismissCreateTagDialog
         )
     }
 }
@@ -444,6 +470,7 @@ private fun GameDetailContent(
     onDeleteRulebookClick: () -> Unit,
     onOpenGame: (Long) -> Unit,
     ownedExpansions: List<BoardGame>,
+    onManageTags: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -554,7 +581,7 @@ private fun GameDetailContent(
 
             // Badge utente (rating + numPlays): visibili solo se impostati
             game.libraryEntry?.let { entry ->
-                UserBadgesSection(entry)
+                UserBadgesSection(entry, game.tags, onManageTags)
             }
 
             // Sezione Regolamento
@@ -867,42 +894,75 @@ private fun ProcessingProgressRow(label: String, progress: Float? = null) {
 // ─── Badge sezione utente ─────────────────────────────────────────────────────
 
 @Composable
-private fun UserBadgesSection(entry: LibraryEntry) {
+private fun UserBadgesSection(entry: LibraryEntry, tags: List<Tag>, onManageTags: () -> Unit) {
     val rateLabel = entry.rate.toRateLabel()
     val numPlaysLabel = entry.numPlays.toNumPlaysLabel()
 
-    if (rateLabel == null && numPlaysLabel == null) return
+    if (rateLabel == null && numPlaysLabel == null && tags.isEmpty()) return
 
     Spacer(Modifier.height(16.dp))
     HorizontalDivider(color = SurfaceVariant)
     Spacer(Modifier.height(12.dp))
 
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        rateLabel?.let { label ->
+    if (rateLabel != null || numPlaysLabel != null) {
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            rateLabel?.let { label ->
+                AssistChip(
+                    onClick = {},
+                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Star,
+                            contentDescription = null,
+                            tint = AccentOrange,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    },
+                    colors = AssistChipDefaults.assistChipColors(containerColor = SurfaceVariant),
+                    border = null
+                )
+            }
+            numPlaysLabel?.let { label ->
+                AssistChip(
+                    onClick = {},
+                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                    leadingIcon = {
+                        Icon(
+                            Icons.Default.Replay,
+                            contentDescription = null,
+                            tint = AccentGreen,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    },
+                    colors = AssistChipDefaults.assistChipColors(containerColor = SurfaceVariant),
+                    border = null
+                )
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+
+    // Riga 2 — tag utente (scrollabile: il numero di tag non è limitato)
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(tags, key = { it.id }) { tag ->
             AssistChip(
-                onClick = {},
-                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Star,
-                        contentDescription = null,
-                        tint = AccentOrange,
-                        modifier = Modifier.size(14.dp)
-                    )
+                onClick = onManageTags,
+                label = {
+                    Text(tag.name, style = MaterialTheme.typography.labelSmall, color = Color.White)
                 },
-                colors = AssistChipDefaults.assistChipColors(containerColor = SurfaceVariant),
+                colors = AssistChipDefaults.assistChipColors(containerColor = tag.toComposeColor()),
                 border = null
             )
         }
-        numPlaysLabel?.let { label ->
+        item {
             AssistChip(
-                onClick = {},
-                label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                onClick = onManageTags,
+                label = { Text(if (tags.isEmpty()) "Aggiungi tag" else "+", style = MaterialTheme.typography.labelSmall) },
                 leadingIcon = {
                     Icon(
-                        Icons.Default.Replay,
+                        Icons.Default.Label,
                         contentDescription = null,
-                        tint = AccentGreen,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(14.dp)
                     )
                 },
@@ -1263,6 +1323,160 @@ private fun WishlistSelectionSheet(
             }
         }
     }
+}
+
+// ─── Tag bottom sheet (multi-select) ───────────────────────────────────────────
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun TagSheet(
+    allTags: List<Tag>,
+    assignedTagIds: Set<Long>,
+    onToggleTag: (Long) -> Unit,
+    onCreateNewTag: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .padding(bottom = 24.dp)
+        ) {
+            Text(
+                "Tag",
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(bottom = 12.dp)
+            )
+
+            if (allTags.isEmpty()) {
+                Text(
+                    "Nessun tag ancora creato",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+            } else {
+                LazyColumn(modifier = Modifier.height((allTags.size.coerceAtMost(6) * 48).dp)) {
+                    items(allTags, key = { it.id }) { tag ->
+                        val isChecked = tag.id in assignedTagIds
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onToggleTag(tag.id) }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = if (isChecked) Icons.Default.CheckBox else Icons.Default.CheckBoxOutlineBlank,
+                                contentDescription = null,
+                                tint = if (isChecked) tag.toComposeColor() else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(tag.toComposeColor(), shape = androidx.compose.foundation.shape.CircleShape)
+                            )
+                            Spacer(Modifier.width(8.dp))
+                            Text(
+                                text = tag.name,
+                                style = MaterialTheme.typography.bodyMedium,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onCreateNewTag)
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Label, contentDescription = null, tint = AccentOrange)
+                Spacer(Modifier.width(8.dp))
+                Text("Nuovo tag", style = MaterialTheme.typography.bodyMedium, color = AccentOrange)
+            }
+
+            Spacer(Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text("Fatto") }
+            }
+        }
+    }
+}
+
+// ─── Dialog creazione tag ───────────────────────────────────────────────────────
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun CreateTagDialog(onCreate: (name: String, colorHex: String) -> Unit, onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf("") }
+    var colorHex by remember { mutableStateOf(TagColorDefault) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Nuovo tag") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nome") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(16.dp))
+                Text("Colore", style = MaterialTheme.typography.labelMedium)
+                Spacer(Modifier.height(8.dp))
+                androidx.compose.foundation.layout.FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    TagColorPalette.forEach { hex ->
+                        val selected = hex == colorHex
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clickable { colorHex = hex }
+                                .background(
+                                    color = Color(android.graphics.Color.parseColor(hex)),
+                                    shape = androidx.compose.foundation.shape.CircleShape
+                                ),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (selected) {
+                                Icon(
+                                    Icons.Default.CheckBox,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { if (name.isNotBlank()) onCreate(name, colorHex) },
+                enabled = name.isNotBlank()
+            ) {
+                Text("Crea")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Annulla") }
+        }
+    )
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

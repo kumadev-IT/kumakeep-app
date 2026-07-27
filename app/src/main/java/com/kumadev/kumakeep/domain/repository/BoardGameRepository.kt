@@ -2,6 +2,7 @@ package com.kumadev.kumakeep.domain.repository
 
 import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.SearchResult
+import com.kumadev.kumakeep.domain.model.Tag
 import kotlinx.coroutines.flow.Flow
 
 interface BoardGameRepository {
@@ -25,4 +26,20 @@ interface BoardGameRepository {
     suspend fun removeOwnedExpansion(expansionBggId: Long): Result<Unit>
     /** True se il gioco è in libreria (usato per filtrare le basi possedute). */
     suspend fun isInLibrary(bggId: Long): Boolean
+
+    // ─── Tag utente ─────────────────────────────────────────────────────────
+    /** Tutti i tag definiti dall'utente (per il picker). */
+    fun getAllTags(): Flow<List<Tag>>
+    /** Tag assegnati a un gioco specifico. */
+    fun getTagsForGame(bggId: Long): Flow<List<Tag>>
+    /** Crea un nuovo tag. Fallisce se il nome esiste già. */
+    suspend fun createTag(name: String, colorHex: String): Result<Tag>
+    /** Rinomina/ricolora un tag esistente. */
+    suspend fun updateTag(tagId: Long, name: String, colorHex: String): Result<Unit>
+    /** Elimina un tag (rimuove anche tutte le associazioni ai giochi). */
+    suspend fun deleteTag(tagId: Long): Result<Unit>
+    /** Assegna un tag esistente a un gioco. */
+    suspend fun assignTagToGame(bggId: Long, tagId: Long): Result<Unit>
+    /** Rimuove un tag da un gioco. */
+    suspend fun removeTagFromGame(bggId: Long, tagId: Long): Result<Unit>
 }

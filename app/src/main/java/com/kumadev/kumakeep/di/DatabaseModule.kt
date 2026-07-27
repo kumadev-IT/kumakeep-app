@@ -7,6 +7,7 @@ import com.kumadev.kumakeep.data.local.dao.BoardGameDao
 import com.kumadev.kumakeep.data.local.dao.LibraryDao
 import com.kumadev.kumakeep.data.local.dao.OwnedExpansionDao
 import com.kumadev.kumakeep.data.local.dao.RulebookDao
+import com.kumadev.kumakeep.data.local.dao.TagDao
 import com.kumadev.kumakeep.data.local.dao.WishlistDao
 import dagger.Module
 import dagger.Provides
@@ -31,7 +32,8 @@ object DatabaseModule {
                 KumaKeepDatabase.MIGRATION_1_2,
                 KumaKeepDatabase.MIGRATION_2_3,
                 KumaKeepDatabase.MIGRATION_3_4,
-                KumaKeepDatabase.MIGRATION_4_5
+                KumaKeepDatabase.MIGRATION_4_5,
+                KumaKeepDatabase.MIGRATION_5_6
             )
             .build()
     }
@@ -55,4 +57,8 @@ object DatabaseModule {
     @Provides
     @Singleton
     fun provideOwnedExpansionDao(db: KumaKeepDatabase): OwnedExpansionDao = db.ownedExpansionDao()
+
+    @Provides
+    @Singleton
+    fun provideTagDao(db: KumaKeepDatabase): TagDao = db.tagDao()
 }

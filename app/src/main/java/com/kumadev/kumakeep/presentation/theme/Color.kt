@@ -22,3 +22,17 @@ val RatingWow = Color(0xFFFFD700)
 
 // Build "dev" — colore ben distinto dalla palette prod (usato per icona app + banner DEV MODE)
 val DevBannerRed = Color(0xFFD32F2F)
+
+// Palette selezionabile per i tag utente (swatch nel picker/creazione tag).
+// Formato hex salvato in TagEntity.colorHex, es. "#C4511A".
+val TagColorPalette = listOf(
+    "#C4511A", // AccentOrange
+    "#2A7A5A", // AccentGreen
+    "#4A6FA5", // blu
+    "#8E5CB0", // viola
+    "#C4384A", // rosso
+    "#B08D2A", // ocra
+    "#2A9DA5", // teal
+    "#B0567E"  // rosa
+)
+val TagColorDefault = TagColorPalette.first()

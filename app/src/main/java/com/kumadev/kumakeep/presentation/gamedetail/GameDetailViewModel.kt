@@ -7,13 +7,17 @@ import androidx.lifecycle.viewModelScope
 import com.kumadev.kumakeep.domain.model.BaseGameRef
 import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.Rulebook
+import com.kumadev.kumakeep.domain.model.Tag
 import com.kumadev.kumakeep.domain.model.WishlistWithStatus
 import com.kumadev.kumakeep.domain.model.NumPlays
 import com.kumadev.kumakeep.domain.model.UserRate
 import com.kumadev.kumakeep.domain.usecase.AddOwnedExpansionUseCase
 import com.kumadev.kumakeep.domain.usecase.AddToLibraryUseCase
 import com.kumadev.kumakeep.domain.usecase.AddToWishlistsUseCase
+import com.kumadev.kumakeep.domain.usecase.AssignTagToGameUseCase
+import com.kumadev.kumakeep.domain.usecase.CreateTagUseCase
 import com.kumadev.kumakeep.domain.usecase.DeleteRulebookUseCase
+import com.kumadev.kumakeep.domain.usecase.GetAllTagsUseCase
 import com.kumadev.kumakeep.domain.usecase.GetExpansionBaseLinksUseCase
 import com.kumadev.kumakeep.domain.usecase.GetGameDetailUseCase
 import com.kumadev.kumakeep.domain.usecase.GetOwnedBaseCandidatesUseCase
@@ -23,6 +27,7 @@ import com.kumadev.kumakeep.domain.usecase.GetWishlistsForGameUseCase
 import com.kumadev.kumakeep.domain.usecase.ImportRulebookUseCase
 import com.kumadev.kumakeep.domain.usecase.RemoveFromLibraryUseCase
 import com.kumadev.kumakeep.domain.usecase.RemoveOwnedExpansionUseCase
+import com.kumadev.kumakeep.domain.usecase.RemoveTagFromGameUseCase
 import com.kumadev.kumakeep.domain.usecase.UpdateLibraryEntryUseCase
 import com.kumadev.kumakeep.data.local.preferences.UserPreferences
 import com.kumadev.kumakeep.presentation.SnackbarController
@@ -63,6 +68,10 @@ class GameDetailViewModel @Inject constructor(
     private val getRulebookUseCase: GetRulebookUseCase,
     private val importRulebookUseCase: ImportRulebookUseCase,
     private val deleteRulebookUseCase: DeleteRulebookUseCase,
+    private val getAllTagsUseCase: GetAllTagsUseCase,
+    private val createTagUseCase: CreateTagUseCase,
+    private val assignTagToGameUseCase: AssignTagToGameUseCase,
+    private val removeTagFromGameUseCase: RemoveTagFromGameUseCase,
     private val snackbarController: SnackbarController,
     private val userPreferences: UserPreferences,
     private val rulesReader: RulesReader
@@ -128,6 +137,20 @@ class GameDetailViewModel @Inject constructor(
 
     private val _showDeleteRulebookDialog = MutableStateFlow(false)
     val showDeleteRulebookDialog: StateFlow<Boolean> = _showDeleteRulebookDialog.asStateFlow()
+
+    /** Tutti i tag definiti dall'utente (per il picker). */
+    val allTags: StateFlow<List<Tag>> =
+        getAllTagsUseCase().stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList()
+        )
+
+    private val _showTagSheet = MutableStateFlow(false)
+    val showTagSheet: StateFlow<Boolean> = _showTagSheet.asStateFlow()
+
+    private val _showCreateTagDialog = MutableStateFlow(false)
+    val showCreateTagDialog: StateFlow<Boolean> = _showCreateTagDialog.asStateFlow()
 
     /** URI ricevuto via ACTION_SEND, in attesa di conferma utente */
     private val _pendingImport = MutableStateFlow<Pair<Uri, String>?>(null)
@@ -331,6 +354,45 @@ class GameDetailViewModel @Inject constructor(
             updateLibraryEntryUseCase(bggId, numPlays = numPlays)
                 .onSuccess { loadGame() }
                 .onFailure { snackbarController.sendEvent(SnackbarEvent("Errore aggiornamento partite")) }
+        }
+    }
+
+    // ─── Tag utente ─────────────────────────────────────────────────────────
+
+    fun openTagSheet() { _showTagSheet.value = true }
+    fun dismissTagSheet() { _showTagSheet.value = false }
+
+    fun openCreateTagDialog() { _showCreateTagDialog.value = true }
+    fun dismissCreateTagDialog() { _showCreateTagDialog.value = false }
+
+    /** Assegna o rimuove un tag già esistente dal gioco corrente. */
+    fun toggleGameTag(tagId: Long) {
+        val state = _uiState.value as? GameDetailUiState.Success ?: return
+        val alreadyAssigned = state.game.tags.any { it.id == tagId }
+        viewModelScope.launch {
+            val result = if (alreadyAssigned) {
+                removeTagFromGameUseCase(bggId, tagId)
+            } else {
+                assignTagToGameUseCase(bggId, tagId)
+            }
+            result
+                .onSuccess { loadGame() }
+                .onFailure { snackbarController.sendEvent(SnackbarEvent("Errore aggiornamento tag")) }
+        }
+    }
+
+    /** Crea un nuovo tag e lo assegna subito al gioco corrente. */
+    fun createAndAssignTag(name: String, colorHex: String) {
+        viewModelScope.launch {
+            createTagUseCase(name, colorHex)
+                .onSuccess { tag ->
+                    _showCreateTagDialog.value = false
+                    assignTagToGameUseCase(bggId, tag.id)
+                    loadGame()
+                }
+                .onFailure {
+                    snackbarController.sendEvent(SnackbarEvent(it.message ?: "Errore creazione tag"))
+                }
         }
     }
 
