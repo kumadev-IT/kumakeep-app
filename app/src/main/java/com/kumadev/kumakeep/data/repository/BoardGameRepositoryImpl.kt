@@ -60,7 +60,21 @@ class BoardGameRepositoryImpl @Inject constructor(
                     )
                 }
             }
-            seen.values.toList()
+            // Ordinamento euristico (punto 25): match esatto sempre primo, poi
+            // prefix match (nome che inizia con la query), poi anno decrescente
+            // come ultimo criterio. Nessuna chiamata di rete aggiuntiva: usa solo
+            // dati già presenti nella risposta di /search.
+            val normalizedQuery = query.trim().lowercase()
+            seen.values.sortedWith(
+                compareBy<SearchResult> { result ->
+                    val normalizedName = result.name.trim().lowercase()
+                    when {
+                        normalizedName == normalizedQuery -> 0
+                        normalizedName.startsWith(normalizedQuery) -> 1
+                        else -> 2
+                    }
+                }.thenByDescending { it.yearPublished ?: Int.MIN_VALUE }
+            )
         }
     }
 
