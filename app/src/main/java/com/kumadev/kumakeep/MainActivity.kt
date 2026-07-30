@@ -85,6 +85,19 @@ class MainActivity : ComponentActivity() {
                         && currentRoute != Screen.PdfViewer.route
                         && currentRoute != null
 
+                // Pattern standard Navigation Compose per bottom bar: riusa l'istanza
+                // (ViewModel + stato) della tab già visitata invece di ricrearla ogni
+                // volta da zero, ed evita che il back stack cresca a ogni tap.
+                val navigateToTab: (String) -> Unit = { route ->
+                    navController.navigate(route) {
+                        popUpTo(Screen.Home.route) {
+                            saveState = true
+                        }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     containerColor = MaterialTheme.colorScheme.background,
@@ -108,7 +121,7 @@ class MainActivity : ComponentActivity() {
                             NavigationBar(containerColor = SurfaceDark) {
                                 NavigationBarItem(
                                     selected = currentRoute == Screen.Home.route,
-                                    onClick = { navController.navigate(Screen.Home.route) },
+                                    onClick = { navigateToTab(Screen.Home.route) },
                                     icon = { Icon(Icons.Default.Home, null) },
                                     label = { Text("Home") },
                                     colors = NavigationBarItemDefaults.colors(
@@ -121,7 +134,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 NavigationBarItem(
                                     selected = currentRoute == Screen.Library.route,
-                                    onClick = { navController.navigate(Screen.Library.route) },
+                                    onClick = { navigateToTab(Screen.Library.route) },
                                     icon = { Icon(Icons.Default.CollectionsBookmark, null) },
                                     label = { Text("Library") },
                                     colors = NavigationBarItemDefaults.colors(
@@ -134,7 +147,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 NavigationBarItem(
                                     selected = currentRoute == Screen.Search.route,
-                                    onClick = { navController.navigate(Screen.Search.route) },
+                                    onClick = { navigateToTab(Screen.Search.route) },
                                     icon = { Icon(Icons.Default.Search, null) },
                                     label = { Text("Search") },
                                     colors = NavigationBarItemDefaults.colors(
@@ -147,7 +160,7 @@ class MainActivity : ComponentActivity() {
                                 )
                                 NavigationBarItem(
                                     selected = currentRoute == Screen.Wishlist.route,
-                                    onClick = { navController.navigate(Screen.Wishlist.route) },
+                                    onClick = { navigateToTab(Screen.Wishlist.route) },
                                     icon = { Icon(Icons.Default.FavoriteBorder, null) },
                                     label = { Text("Wishlist") },
                                     colors = NavigationBarItemDefaults.colors(

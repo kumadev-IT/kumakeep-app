@@ -108,13 +108,21 @@ class BoardGameRepositoryImpl @Inject constructor(
     }
 
     override fun getLibraryGames(): Flow<List<BoardGame>> {
+        // Batch invece di N+1: prima erano una query boardGameDao.getByBggId() PER OGNI
+        // riga di libreria (410+ query sequenziali con la collezione importata da CSV),
+        // causa principale della lentezza percepita all'apertura di Home/Library.
+        // Ora un'unica query IN (...) per i giochi + una per i tag, combinate.
         return libraryDao.getAll().flatMapLatest { libraryEntries ->
             val bggIds = libraryEntries.map { it.bggId }
-            val tagsFlow = if (bggIds.isEmpty()) flowOf(emptyList()) else tagDao.getTagsForGames(bggIds)
-            tagsFlow.map { tagRows ->
+            if (bggIds.isEmpty()) return@flatMapLatest flowOf(emptyList())
+            combine(
+                boardGameDao.getByBggIds(bggIds),
+                tagDao.getTagsForGames(bggIds)
+            ) { games, tagRows ->
+                val gamesById = games.associateBy { it.bggId }
                 val tagsByGame = tagRows.groupBy(GameTagRow::bggId)
                 libraryEntries.mapNotNull { entry ->
-                    val game = boardGameDao.getByBggId(entry.bggId) ?: return@mapNotNull null
+                    val game = gamesById[entry.bggId] ?: return@mapNotNull null
                     val tags = tagsByGame[entry.bggId]?.map { it.toDomain() } ?: emptyList()
                     game.toDomain(entry, tags)
                 }

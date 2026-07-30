@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class HomeUiState(
+    val isLoading: Boolean = true,
     val username: String = "",
     val carouselSize: Int = 10,
     val libraryCount: Int = 0,
@@ -81,6 +82,7 @@ class HomeViewModel @Inject constructor(
             }.collect { snap ->
                 _uiState.update {
                     it.copy(
+                        isLoading = false,
                         libraryCount = snap.games.size,
                         playedCount = snap.playedCount,
                         wishlistCount = snap.wishlistCount,

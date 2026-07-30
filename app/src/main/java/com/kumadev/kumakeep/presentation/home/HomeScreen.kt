@@ -1,6 +1,13 @@
 package com.kumadev.kumakeep.presentation.home
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -141,10 +148,16 @@ fun HomeScreen(
                         .padding(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    StatCard(label = "Games", value = uiState.libraryCount, modifier = Modifier.weight(1f))
-                    StatCard(label = "Wishlist", value = uiState.wishlistCount, modifier = Modifier.weight(1f))
-                    StatCard(label = "Played", value = uiState.playedCount, modifier = Modifier.weight(1f))
-                    StatCard(label = "Expansions", value = uiState.expansionCount, modifier = Modifier.weight(1f))
+                    if (uiState.isLoading) {
+                        repeat(4) {
+                            ShimmerBox(modifier = Modifier.weight(1f).height(58.dp))
+                        }
+                    } else {
+                        StatCard(label = "Games", value = uiState.libraryCount, modifier = Modifier.weight(1f))
+                        StatCard(label = "Wishlist", value = uiState.wishlistCount, modifier = Modifier.weight(1f))
+                        StatCard(label = "Played", value = uiState.playedCount, modifier = Modifier.weight(1f))
+                        StatCard(label = "Expansions", value = uiState.expansionCount, modifier = Modifier.weight(1f))
+                    }
                 }
 
                 Spacer(Modifier.height(24.dp))
@@ -152,10 +165,10 @@ fun HomeScreen(
                 // ── Recently Added ────────────────────────────────────────────
                 SectionHeader("Recently Added")
                 Spacer(Modifier.height(8.dp))
-                if (uiState.recentlyAdded.isEmpty()) {
-                    EmptyCarouselHint("Add games to your library to see them here")
-                } else {
-                    LazyRow(
+                when {
+                    uiState.isLoading -> CarouselShimmer()
+                    uiState.recentlyAdded.isEmpty() -> EmptyCarouselHint("Add games to your library to see them here")
+                    else -> LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
@@ -170,10 +183,10 @@ fun HomeScreen(
                 // ── Recently Viewed ───────────────────────────────────────────
                 SectionHeader("Recently Viewed")
                 Spacer(Modifier.height(8.dp))
-                if (uiState.recentlyViewed.isEmpty()) {
-                    EmptyCarouselHint("Open a game to see it here")
-                } else {
-                    LazyRow(
+                when {
+                    uiState.isLoading -> CarouselShimmer()
+                    uiState.recentlyViewed.isEmpty() -> EmptyCarouselHint("Open a game to see it here")
+                    else -> LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
@@ -222,6 +235,39 @@ private fun SectionHeader(title: String) {
         color = TextSecondary,
         modifier = Modifier.padding(horizontal = 16.dp)
     )
+}
+
+/** Rettangolo con pulsazione di opacità, usato come placeholder durante il caricamento. */
+@Composable
+private fun ShimmerBox(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "shimmer")
+    val alpha by transition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.55f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(700, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "shimmerAlpha"
+    )
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(SurfaceDark.copy(alpha = alpha))
+    )
+}
+
+/** Placeholder di un carosello di GameCard, mostrato mentre i dati sono in caricamento. */
+@Composable
+private fun CarouselShimmer() {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        items(3) {
+            ShimmerBox(modifier = Modifier.width(96.dp).height(150.dp))
+        }
+    }
 }
 
 @Composable
