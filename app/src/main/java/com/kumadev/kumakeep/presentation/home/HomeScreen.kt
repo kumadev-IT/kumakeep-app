@@ -258,17 +258,19 @@ private fun GameCard(game: BoardGame, onClick: () -> Unit) {
                     text = game.primaryName,
                     style = MaterialTheme.typography.labelSmall,
                     color = TextPrimary,
+                    minLines = 2,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     fontWeight = FontWeight.Medium
                 )
-                if (game.yearPublished != null) {
-                    Text(
-                        text = game.yearPublished.toString(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = TextSecondary
-                    )
-                }
+                // Riga sempre presente (anche vuota) così tutte le card hanno la stessa
+                // altezza indipendentemente dalla lunghezza del titolo o dalla presenza dell'anno.
+                Text(
+                    text = game.yearPublished?.toString() ?: " ",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary,
+                    maxLines = 1
+                )
             }
         }
     }
