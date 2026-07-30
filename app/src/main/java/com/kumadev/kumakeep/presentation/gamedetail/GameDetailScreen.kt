@@ -118,6 +118,7 @@ fun GameDetailScreen(
     val showNumPlaysSheet by viewModel.showNumPlaysSheet.collectAsStateWithLifecycle()
     val rulebook by viewModel.rulebook.collectAsStateWithLifecycle()
     val showDeleteRulebookDialog by viewModel.showDeleteRulebookDialog.collectAsStateWithLifecycle()
+    val showRemoveFromLibraryDialog by viewModel.showRemoveFromLibraryDialog.collectAsStateWithLifecycle()
     val pendingImport by viewModel.pendingImport.collectAsStateWithLifecycle()
     val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
     val processingState by viewModel.rulebookProcessingState.collectAsStateWithLifecycle()
@@ -275,6 +276,27 @@ fun GameDetailScreen(
             },
             dismissButton = {
                 TextButton(onClick = viewModel::dismissDeleteRulebookDialog) { Text("Annulla") }
+            }
+        )
+    }
+
+    if (showRemoveFromLibraryDialog && currentState is GameDetailUiState.Success) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissRemoveFromLibraryDialog,
+            title = { Text("Rimuovi dalla libreria") },
+            text = {
+                Text(
+                    "Vuoi rimuovere \"${currentState.game.primaryName}\" dalla libreria? " +
+                        "Voto e partite registrate andranno persi."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmRemoveFromLibrary) {
+                    Text("Rimuovi", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissRemoveFromLibraryDialog) { Text("Annulla") }
             }
         )
     }

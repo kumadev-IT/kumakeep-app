@@ -26,6 +26,9 @@ sealed interface LibraryUiState {
     data class Success(val games: List<BoardGame>, val isFiltered: Boolean = false) : LibraryUiState
 }
 
+/** Gioco in attesa di conferma di rimozione dalla libreria. */
+data class PendingLibraryRemoval(val bggId: Long, val gameName: String)
+
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val getLibraryUseCase: GetLibraryUseCase,
@@ -41,6 +44,10 @@ class LibraryViewModel @Inject constructor(
     /** Tag selezionati per il filtro. Un gioco deve averli tutti (AND) per comparire. */
     private val _selectedTagIds = MutableStateFlow<Set<Long>>(emptySet())
     val selectedTagIds: StateFlow<Set<Long>> = _selectedTagIds.asStateFlow()
+
+    /** Gioco per cui è stata richiesta la rimozione, in attesa di conferma dell'utente. */
+    private val _pendingRemoval = MutableStateFlow<PendingLibraryRemoval?>(null)
+    val pendingRemoval: StateFlow<PendingLibraryRemoval?> = _pendingRemoval.asStateFlow()
 
     /** Tutti i tag esistenti, per la riga di filtro chip. */
     val allTags: StateFlow<List<Tag>> = getAllTagsUseCase().stateIn(
@@ -84,7 +91,22 @@ class LibraryViewModel @Inject constructor(
         _selectedTagIds.value = emptySet()
     }
 
-    fun removeFromLibrary(bggId: Long, gameName: String) {
+    /** Richiede la rimozione: apre il dialog di conferma invece di rimuovere subito. */
+    fun requestRemoveFromLibrary(bggId: Long, gameName: String) {
+        _pendingRemoval.value = PendingLibraryRemoval(bggId, gameName)
+    }
+
+    fun cancelRemoveFromLibrary() {
+        _pendingRemoval.value = null
+    }
+
+    fun confirmRemoveFromLibrary() {
+        val pending = _pendingRemoval.value ?: return
+        _pendingRemoval.value = null
+        removeFromLibrary(pending.bggId, pending.gameName)
+    }
+
+    private fun removeFromLibrary(bggId: Long, gameName: String) {
         viewModelScope.launch {
             removeFromLibraryUseCase(bggId)
                 .onSuccess {

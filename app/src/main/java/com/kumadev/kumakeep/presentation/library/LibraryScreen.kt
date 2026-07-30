@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -33,6 +34,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -65,6 +67,7 @@ fun LibraryScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     val selectedTagIds by viewModel.selectedTagIds.collectAsStateWithLifecycle()
+    val pendingRemoval by viewModel.pendingRemoval.collectAsStateWithLifecycle()
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -209,7 +212,7 @@ fun LibraryScreen(
                                 LibraryGameCard(
                                     game = game,
                                     onClick = { onGameClick(game.bggId) },
-                                    onRemove = { viewModel.removeFromLibrary(game.bggId, game.primaryName) }
+                                    onRemove = { viewModel.requestRemoveFromLibrary(game.bggId, game.primaryName) }
                                 )
                             }
                         }
@@ -217,6 +220,27 @@ fun LibraryScreen(
                 }
             }
         }
+    }
+
+    pendingRemoval?.let { pending ->
+        AlertDialog(
+            onDismissRequest = viewModel::cancelRemoveFromLibrary,
+            title = { Text("Rimuovi dalla libreria") },
+            text = {
+                Text(
+                    "Vuoi rimuovere \"${pending.gameName}\" dalla libreria? " +
+                        "Voto e partite registrate andranno persi."
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::confirmRemoveFromLibrary) {
+                    Text("Rimuovi", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::cancelRemoveFromLibrary) { Text("Annulla") }
+            }
+        )
     }
 }
 

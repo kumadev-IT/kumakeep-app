@@ -138,6 +138,9 @@ class GameDetailViewModel @Inject constructor(
     private val _showDeleteRulebookDialog = MutableStateFlow(false)
     val showDeleteRulebookDialog: StateFlow<Boolean> = _showDeleteRulebookDialog.asStateFlow()
 
+    private val _showRemoveFromLibraryDialog = MutableStateFlow(false)
+    val showRemoveFromLibraryDialog: StateFlow<Boolean> = _showRemoveFromLibraryDialog.asStateFlow()
+
     /** Tutti i tag definiti dall'utente (per il picker). */
     val allTags: StateFlow<List<Tag>> =
         getAllTagsUseCase().stateIn(
@@ -177,38 +180,51 @@ class GameDetailViewModel @Inject constructor(
 
     fun toggleLibrary() {
         val state = _uiState.value as? GameDetailUiState.Success ?: return
+        if (state.game.libraryEntry != null) {
+            // La rimozione cancella anche voto e partite registrate: chiediamo conferma.
+            _showRemoveFromLibraryDialog.value = true
+            return
+        }
         viewModelScope.launch {
-            if (state.game.libraryEntry != null) {
-                removeFromLibraryUseCase(bggId)
-                    .onSuccess {
-                        _libraryAction.value = LibraryAction.Removed
-                        loadGame()
-                        snackbarController.sendEvent(
-                            SnackbarEvent(
-                                message = "\"${state.game.primaryName}\" rimosso dalla libreria",
-                                actionLabel = "Annulla",
-                                onAction = {
-                                    viewModelScope.launch { addToLibraryUseCase(bggId).onSuccess { loadGame() } }
-                                }
-                            )
+            addToLibraryUseCase(bggId)
+                .onSuccess {
+                    _libraryAction.value = LibraryAction.Added
+                    loadGame()
+                    snackbarController.sendEvent(
+                        SnackbarEvent(message = "\"${state.game.primaryName}\" aggiunto alla libreria")
+                    )
+                }
+                .onFailure {
+                    snackbarController.sendEvent(SnackbarEvent(message = "Errore durante l'aggiunta"))
+                }
+        }
+    }
+
+    fun dismissRemoveFromLibraryDialog() {
+        _showRemoveFromLibraryDialog.value = false
+    }
+
+    fun confirmRemoveFromLibrary() {
+        val state = _uiState.value as? GameDetailUiState.Success ?: return
+        _showRemoveFromLibraryDialog.value = false
+        viewModelScope.launch {
+            removeFromLibraryUseCase(bggId)
+                .onSuccess {
+                    _libraryAction.value = LibraryAction.Removed
+                    loadGame()
+                    snackbarController.sendEvent(
+                        SnackbarEvent(
+                            message = "\"${state.game.primaryName}\" rimosso dalla libreria",
+                            actionLabel = "Annulla",
+                            onAction = {
+                                viewModelScope.launch { addToLibraryUseCase(bggId).onSuccess { loadGame() } }
+                            }
                         )
-                    }
-                    .onFailure {
-                        snackbarController.sendEvent(SnackbarEvent(message = "Errore durante la rimozione"))
-                    }
-            } else {
-                addToLibraryUseCase(bggId)
-                    .onSuccess {
-                        _libraryAction.value = LibraryAction.Added
-                        loadGame()
-                        snackbarController.sendEvent(
-                            SnackbarEvent(message = "\"${state.game.primaryName}\" aggiunto alla libreria")
-                        )
-                    }
-                    .onFailure {
-                        snackbarController.sendEvent(SnackbarEvent(message = "Errore durante l'aggiunta"))
-                    }
-            }
+                    )
+                }
+                .onFailure {
+                    snackbarController.sendEvent(SnackbarEvent(message = "Errore durante la rimozione"))
+                }
         }
     }
 
