@@ -1,5 +1,6 @@
 package com.kumadev.kumakeep.presentation.library
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,9 +54,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.UserRate
-import com.kumadev.kumakeep.presentation.theme.AccentGreen
+import com.kumadev.kumakeep.presentation.theme.RateFilterOrder
 import com.kumadev.kumakeep.presentation.theme.SurfaceVariant
 import com.kumadev.kumakeep.presentation.theme.toComposeColor
+import com.kumadev.kumakeep.presentation.theme.toOnColor
+import com.kumadev.kumakeep.presentation.theme.toShortLabel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,6 +70,7 @@ fun LibraryScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val allTags by viewModel.allTags.collectAsStateWithLifecycle()
     val selectedTagIds by viewModel.selectedTagIds.collectAsStateWithLifecycle()
+    val selectedRates by viewModel.selectedRates.collectAsStateWithLifecycle()
     val pendingRemoval by viewModel.pendingRemoval.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -128,6 +132,45 @@ fun LibraryScreen(
                     .fillMaxWidth()
                     .padding(top = 8.dp, bottom = 8.dp)
             )
+
+            // Filtro per voto: OR tra i voti selezionati, in scala Wow → Meh.
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.padding(bottom = 8.dp)
+            ) {
+                items(RateFilterOrder, key = { it.name }) { rate ->
+                    val selected = rate in selectedRates
+                    val rateColor = rate.toComposeColor()
+                    FilterChip(
+                        selected = selected,
+                        onClick = { viewModel.toggleRateFilter(rate) },
+                        label = {
+                            Text(
+                                rate.toShortLabel(),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (selected) rate.toOnColor() else rateColor
+                            )
+                        },
+                        leadingIcon = if (selected) {
+                            {
+                                Icon(
+                                    Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = rate.toOnColor(),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        } else null,
+                        colors = FilterChipDefaults.filterChipColors(
+                            containerColor = Color.Transparent,
+                            selectedContainerColor = rateColor
+                        ),
+                        // BorderStroke esplicito invece di FilterChipDefaults.filterChipBorder:
+                        // la firma di quest'ultimo è cambiata tra le versioni di Material3.
+                        border = if (selected) null else BorderStroke(1.dp, rateColor)
+                    )
+                }
+            }
 
             if (allTags.isNotEmpty()) {
                 LazyRow(
@@ -289,9 +332,10 @@ private fun LibraryGameCard(
                 game.libraryEntry?.let { entry ->
                     if (entry.rate != UserRate.NOT_RATED) {
                         Text(
-                            text = entry.rate.name,
+                            text = entry.rate.toShortLabel(),
                             style = MaterialTheme.typography.labelSmall,
-                            color = AccentGreen
+                            fontWeight = FontWeight.SemiBold,
+                            color = entry.rate.toComposeColor()
                         )
                     }
                 }

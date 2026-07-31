@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kumadev.kumakeep.domain.model.BoardGame
 import com.kumadev.kumakeep.domain.model.Tag
+import com.kumadev.kumakeep.domain.model.UserRate
 import com.kumadev.kumakeep.domain.usecase.AddToLibraryUseCase
 import com.kumadev.kumakeep.domain.usecase.GetAllTagsUseCase
 import com.kumadev.kumakeep.domain.usecase.GetLibraryUseCase
@@ -45,6 +46,14 @@ class LibraryViewModel @Inject constructor(
     private val _selectedTagIds = MutableStateFlow<Set<Long>>(emptySet())
     val selectedTagIds: StateFlow<Set<Long>> = _selectedTagIds.asStateFlow()
 
+    /**
+     * Voti selezionati per il filtro. A differenza dei tag la logica è OR: "Wow + Top"
+     * significa "i miei preferiti", non "giochi votati sia Wow sia Top" (impossibile).
+     * Set vuoto = nessun filtro sul voto.
+     */
+    private val _selectedRates = MutableStateFlow<Set<UserRate>>(emptySet())
+    val selectedRates: StateFlow<Set<UserRate>> = _selectedRates.asStateFlow()
+
     /** Gioco per cui è stata richiesta la rimozione, in attesa di conferma dell'utente. */
     private val _pendingRemoval = MutableStateFlow<PendingLibraryRemoval?>(null)
     val pendingRemoval: StateFlow<PendingLibraryRemoval?> = _pendingRemoval.asStateFlow()
@@ -59,17 +68,28 @@ class LibraryViewModel @Inject constructor(
     val uiState: StateFlow<LibraryUiState> = combine(
         getLibraryUseCase(),
         _searchQuery,
-        _selectedTagIds
-    ) { games, query, tagIds ->
+        _selectedTagIds,
+        _selectedRates
+    ) { games, query, tagIds, rates ->
         val byQuery = if (query.isBlank()) games
         else games.filter { it.primaryName.contains(query, ignoreCase = true) }
-        val filtered = if (tagIds.isEmpty()) byQuery
+        val byTags = if (tagIds.isEmpty()) byQuery
         else byQuery.filter { game -> tagIds.all { id -> game.tags.any { it.id == id } } }
-        val isFiltered = query.isNotBlank() || tagIds.isNotEmpty()
+        val filtered = if (rates.isEmpty()) byTags
+        else byTags.filter { (it.libraryEntry?.rate ?: UserRate.NOT_RATED) in rates }
+        // L'ordine di default della libreria (inserimento) resta intatto: si passa a
+        // "dal migliore al peggiore" solo quando il filtro voto è attivo, dove serve
+        // davvero (es. Wow + Top insieme).
+        val sorted = if (rates.isEmpty()) filtered
+        else filtered.sortedWith(
+            compareByDescending<BoardGame> { it.libraryEntry?.rate?.rank ?: 0 }
+                .thenBy { it.primaryName.lowercase() }
+        )
+        val isFiltered = query.isNotBlank() || tagIds.isNotEmpty() || rates.isNotEmpty()
         when {
             games.isEmpty() -> LibraryUiState.Empty
-            filtered.isEmpty() -> LibraryUiState.Success(emptyList(), isFiltered = true)
-            else -> LibraryUiState.Success(filtered, isFiltered = isFiltered)
+            sorted.isEmpty() -> LibraryUiState.Success(emptyList(), isFiltered = true)
+            else -> LibraryUiState.Success(sorted, isFiltered = isFiltered)
         }
     }.stateIn(
         scope = viewModelScope,
@@ -89,6 +109,16 @@ class LibraryViewModel @Inject constructor(
 
     fun clearTagFilters() {
         _selectedTagIds.value = emptySet()
+    }
+
+    fun toggleRateFilter(rate: UserRate) {
+        _selectedRates.value = _selectedRates.value.let { current ->
+            if (rate in current) current - rate else current + rate
+        }
+    }
+
+    fun clearRateFilters() {
+        _selectedRates.value = emptySet()
     }
 
     /** Richiede la rimozione: apre il dialog di conferma invece di rimuovere subito. */

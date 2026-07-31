@@ -49,7 +49,21 @@ data class LibraryEntry(
 )
 
 enum class UserRate {
-    BAH, MID, YES, TOP, WOW, NOT_RATED
+    BAH, MID, YES, TOP, WOW, NOT_RATED;
+
+    /**
+     * Peso per l'ordinamento "dal migliore al peggiore". Non si può usare `ordinal`:
+     * NOT_RATED è l'ultima costante e in un sort decrescente finirebbe in cima.
+     */
+    val rank: Int
+        get() = when (this) {
+            WOW -> 5
+            TOP -> 4
+            YES -> 3
+            MID -> 2
+            BAH -> 1
+            NOT_RATED -> 0
+        }
 }
 
 enum class NumPlays {
