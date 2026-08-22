@@ -80,3 +80,15 @@ data class SearchResult(
     // true se già posseduto: in libreria (giochi base) o collegato a una base (espansioni)
     val isOwned: Boolean = false
 )
+
+// modello leggero per la hot list BGG (Home): solo i campi minimi per una card,
+// mai persistito su DB — la card apre il dettaglio, che scarica/mette in cache
+// i dati completi al bisogno (stesso comportamento dei risultati di ricerca).
+data class HotGame(
+    // posizione nella hot list ufficiale BGG (1 = il più "caldo" del momento)
+    val rank: Int,
+    val bggId: Long,
+    val name: String,
+    val yearPublished: Int?,
+    val thumbnail: String?
+)

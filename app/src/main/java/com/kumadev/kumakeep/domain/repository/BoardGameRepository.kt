@@ -1,6 +1,7 @@
 package com.kumadev.kumakeep.domain.repository
 
 import com.kumadev.kumakeep.domain.model.BoardGame
+import com.kumadev.kumakeep.domain.model.HotGame
 import com.kumadev.kumakeep.domain.model.SearchResult
 import com.kumadev.kumakeep.domain.model.Tag
 import kotlinx.coroutines.flow.Flow
@@ -12,6 +13,8 @@ interface BoardGameRepository {
     fun getPlayedCount(): Flow<Int>
     fun getWishlistGameCount(): Flow<Int>
     fun getRecentlyViewedGames(bggIds: List<Long>): Flow<List<BoardGame>>
+    /** Hot list ufficiale BGG (rank 1..50), aggiornata periodicamente da BGG lato server. */
+    suspend fun getHotGames(): Result<List<HotGame>>
 
     // ─── Espansioni possedute ─────────────────────────────────────────────────
     /** Espansioni possedute collegate a un gioco base. */

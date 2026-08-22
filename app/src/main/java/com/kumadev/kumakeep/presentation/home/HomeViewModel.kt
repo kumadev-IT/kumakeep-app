@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.kumadev.kumakeep.data.local.preferences.UserPreferences
 import com.kumadev.kumakeep.domain.model.BoardGame
+import com.kumadev.kumakeep.domain.model.HotGame
 import com.kumadev.kumakeep.domain.repository.BoardGameRepository
 import com.kumadev.kumakeep.domain.usecase.GetLibraryUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,7 +27,12 @@ data class HomeUiState(
     val playedCount: Int = 0,
     val expansionCount: Int = 0,
     val recentlyAdded: List<BoardGame> = emptyList(),
-    val recentlyViewed: List<BoardGame> = emptyList()
+    val recentlyViewed: List<BoardGame> = emptyList(),
+    // Hot list BGG: chiamata di rete singola e indipendente dal resto della Home,
+    // stato di caricamento separato apposta (non deve bloccare/essere bloccata
+    // dagli altri caroselli, che sono reattivi su DB locale).
+    val isHotLoading: Boolean = true,
+    val hotGames: List<HotGame> = emptyList()
 )
 
 private data class LibrarySnapshot(
@@ -104,6 +110,20 @@ class HomeViewModel @Inject constructor(
                 }
                 .collect { games ->
                     _uiState.update { it.copy(recentlyViewed = games) }
+                }
+        }
+
+        // Hot list BGG — chiamata di rete singola (non reattiva come le altre
+        // liste della Home), cache 1h lato repository: non si ripete ad ogni
+        // ritorno sulla tab Home nella stessa sessione (il ViewModel sopravvive
+        // ai cambi tab, vedi punto 26 del todo).
+        viewModelScope.launch {
+            repository.getHotGames()
+                .onSuccess { games ->
+                    _uiState.update { it.copy(hotGames = games, isHotLoading = false) }
+                }
+                .onFailure {
+                    _uiState.update { it.copy(isHotLoading = false) }
                 }
         }
     }

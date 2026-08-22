@@ -8,8 +8,10 @@ import com.kumadev.kumakeep.data.local.entity.BoardGameEntity
 import com.kumadev.kumakeep.data.local.entity.GameTagEntity
 import com.kumadev.kumakeep.data.local.entity.TagEntity
 import com.kumadev.kumakeep.data.remote.api.BggApiService
+import com.kumadev.kumakeep.data.remote.mapper.toDomain
 import com.kumadev.kumakeep.data.remote.mapper.toEntity
 import com.kumadev.kumakeep.domain.model.BoardGame
+import com.kumadev.kumakeep.domain.model.HotGame
 import com.kumadev.kumakeep.domain.model.LibraryEntry
 import com.kumadev.kumakeep.domain.model.SearchResult
 import com.kumadev.kumakeep.domain.model.Tag
@@ -30,6 +32,13 @@ class BoardGameRepositoryImpl @Inject constructor(
     private val tagDao: TagDao,
     private val bggApiService: BggApiService
 ) : BoardGameRepository {
+
+    // Cache in-memoria per la hot list: chiamata di rete "leggera" ma comunque
+    // non reattiva come le altre liste della Home — un TTL breve evita di
+    // richiamarla ad ogni ritorno sulla tab Home nella stessa sessione app
+    // (il ViewModel Home sopravvive ai cambi tab, vedi punto 26 del todo).
+    private var hotGamesCache: List<HotGame>? = null
+    private var hotGamesCachedAt: Long = 0L
 
     override suspend fun searchBgg(query: String): Result<List<SearchResult>> {
         return runCatching {
@@ -156,6 +165,24 @@ class BoardGameRepositoryImpl @Inject constructor(
         }
     }
 
+    override suspend fun getHotGames(): Result<List<HotGame>> {
+        val cached = hotGamesCache
+        if (cached != null && System.currentTimeMillis() - hotGamesCachedAt < HOT_GAMES_CACHE_TTL_MS) {
+            return Result.success(cached)
+        }
+        return try {
+            val fresh = bggApiService.getHotGames().items.map { it.toDomain() }
+            hotGamesCache = fresh
+            hotGamesCachedAt = System.currentTimeMillis()
+            Result.success(fresh)
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Rete assente: una copia scaduta è comunque meglio di niente, se disponibile.
+            cached?.let { Result.success(it) } ?: Result.failure(e)
+        }
+    }
+
     // ─── Espansioni possedute ─────────────────────────────────────────────────
 
     override fun getOwnedExpansions(baseBggId: Long): Flow<List<BoardGame>> =
@@ -255,6 +282,11 @@ private fun BoardGameEntity.cacheTtlMillis(): Long {
         else -> 90 * DAY_MS
     }
 }
+
+// TTL per la cache in-memoria della hot list BGG: dato che cambia un paio di
+// volte al giorno lato BGG, 1h basta ad evitare chiamate ripetute nella stessa
+// sessione senza mostrare mai un ranking vistosamente stantio.
+private const val HOT_GAMES_CACHE_TTL_MS = 60L * 60 * 1000
 
 private fun TagEntity.toDomain(): Tag = Tag(id = id, name = name, colorHex = colorHex)
 

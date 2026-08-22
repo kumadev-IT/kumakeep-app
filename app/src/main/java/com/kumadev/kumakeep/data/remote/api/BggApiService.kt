@@ -1,5 +1,6 @@
 package com.kumadev.kumakeep.data.remote.api
 
+import com.kumadev.kumakeep.data.remote.dto.BggHotResponse
 import com.kumadev.kumakeep.data.remote.dto.BggSearchResponse
 import com.kumadev.kumakeep.data.remote.dto.BggThingResponse
 import retrofit2.http.GET
@@ -23,4 +24,11 @@ interface BggApiService {
         @Query("id") id: Long,
         @Query("stats") stats: Int = 1
     ): BggThingResponse
+
+    // Hot list ufficiale BGG, ordinata per rank. Endpoint dedicato e leggero:
+    // nessun id in input, nessuna paginazione (BGG restituisce al massimo 50 item).
+    @GET("hot")
+    suspend fun getHotGames(
+        @Query("type") type: String = "boardgame"
+    ): BggHotResponse
 }

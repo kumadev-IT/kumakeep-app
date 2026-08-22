@@ -58,6 +58,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.kumadev.kumakeep.R
 import com.kumadev.kumakeep.domain.model.BoardGame
+import com.kumadev.kumakeep.domain.model.HotGame
+import com.kumadev.kumakeep.presentation.theme.AccentOrange
 import com.kumadev.kumakeep.presentation.theme.SurfaceDark
 import com.kumadev.kumakeep.presentation.theme.TextPrimary
 import com.kumadev.kumakeep.presentation.theme.TextSecondary
@@ -196,6 +198,28 @@ fun HomeScreen(
                     }
                 }
 
+                Spacer(Modifier.height(24.dp))
+
+                // ── BGG Hotness ───────────────────────────────────────────────
+                // Hot list ufficiale BGG (rank 1..50): a differenza degli altri due
+                // caroselli non è reattiva su DB locale ma una singola chiamata di
+                // rete (cache 1h lato repository), quindi ha un proprio stato di
+                // caricamento (isHotLoading) indipendente da isLoading.
+                SectionHeader("BGG Hotness")
+                Spacer(Modifier.height(8.dp))
+                when {
+                    uiState.isHotLoading -> CarouselShimmer()
+                    uiState.hotGames.isEmpty() -> EmptyCarouselHint("Hot list BGG non disponibile al momento")
+                    else -> LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(uiState.hotGames, key = { it.bggId }) { hotGame ->
+                            HotGameCard(game = hotGame, onClick = { onGameClick(hotGame.bggId) })
+                        }
+                    }
+                }
+
                 Spacer(Modifier.height(16.dp))
             }
         }
@@ -311,6 +335,68 @@ private fun GameCard(game: BoardGame, onClick: () -> Unit) {
                 )
                 // Riga sempre presente (anche vuota) così tutte le card hanno la stessa
                 // altezza indipendentemente dalla lunghezza del titolo o dalla presenza dell'anno.
+                Text(
+                    text = game.yearPublished?.toString() ?: " ",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextSecondary,
+                    maxLines = 1
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Card per il carosello BGG Hotness: stesso layout/dimensioni di [GameCard] (stesso
+ * componente non riusato direttamente perché [HotGame] non è un [BoardGame] — dato
+ * volutamente leggero, mai persistito, vedi commento sul modello) più il badge con
+ * il rank ufficiale BGG sovrapposto in alto a sinistra sulla copertina.
+ */
+@Composable
+private fun HotGameCard(game: HotGame, onClick: () -> Unit) {
+    Card(
+        onClick = onClick,
+        modifier = Modifier.width(96.dp),
+        colors = CardDefaults.cardColors(containerColor = SurfaceDark),
+        shape = RoundedCornerShape(8.dp)
+    ) {
+        Column {
+            Box {
+                AsyncImage(
+                    model = game.thumbnail,
+                    contentDescription = game.name,
+                    modifier = Modifier
+                        .size(96.dp)
+                        .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp)),
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(id = R.mipmap.ic_launcher_foreground),
+                    error = painterResource(id = R.mipmap.ic_launcher_foreground)
+                )
+                Box(
+                    modifier = Modifier
+                        .padding(4.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(AccentOrange)
+                ) {
+                    Text(
+                        text = "#${game.rank}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextPrimary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp)
+                    )
+                }
+            }
+            Column(modifier = Modifier.padding(6.dp)) {
+                Text(
+                    text = game.name,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = TextPrimary,
+                    minLines = 2,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = FontWeight.Medium
+                )
                 Text(
                     text = game.yearPublished?.toString() ?: " ",
                     style = MaterialTheme.typography.labelSmall,

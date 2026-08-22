@@ -1,8 +1,10 @@
 package com.kumadev.kumakeep.data.remote.mapper
 
 import com.kumadev.kumakeep.data.local.entity.BoardGameEntity
+import com.kumadev.kumakeep.data.remote.dto.BggHotItemDto
 import com.kumadev.kumakeep.data.remote.dto.BggItemDto
 import com.kumadev.kumakeep.domain.model.BaseGameRef
+import com.kumadev.kumakeep.domain.model.HotGame
 
 // Serializzazione dei riferimenti ai giochi base in un'unica colonna TEXT
 // (baseGamesRef). Formato per record: "<id>:<nome>", record separati da newline.
@@ -51,3 +53,12 @@ fun parseBaseGames(raw: String?): List<BaseGameRef> {
         BaseGameRef(id, name)
     }
 }
+
+/** Mappa un item della hot list BGG nel modello leggero usato solo per la UI (non persistito). */
+fun BggHotItemDto.toDomain(): HotGame = HotGame(
+    rank = rank,
+    bggId = id,
+    name = name?.value ?: "",
+    yearPublished = yearPublished?.value,
+    thumbnail = thumbnail?.value
+)
